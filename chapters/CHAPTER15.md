@@ -1,0 +1,15 @@
+# Optimizations
+1. https://wiki.postgresql.org/wiki/Monitoring
+2. https://www.percona.com/software/database-tools/percona-monitoring-and-management
+3. https://grafana.com/
+4. https://www.percona.com/doc/percona-monitoring-and-management/2.x/install/docker-setting-up.html
+5. https://okmeter.io/
+6. https://en.wikipedia.org/wiki/Network-attached_storage 
+7. https://en.wikipedia.org/wiki/Ceph_(software)
+8. http://pgconfigurator.cybertec.at/
+9. https://pgtune.leopard.in.ua/
+10. https://www.postgresql.org/docs/13/geqo-pg-intro.html
+11. https://tatiyants.com/pev
+12. https://explain.depesz.com/
+13. https://postgres.ai/docs/database-lab/what_is_database_lab
+14. https://github.com/ohmu/pgmemcache

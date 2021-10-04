@@ -1,0 +1,26 @@
+-- EC2
+mv postgres_key.pem $HOME
+cd $HOME
+chmod 400 postgres_key.pem
+ssh -i postgres_key.pem azureuser@13.90.25.231
+
+sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt-get -y install postgresql && sudo apt install unzip
+pg_lsclusters
+
+sudo -u postgres psql
+\password
+-- test123
+exit
+-- listener = '*'
+sudo nano /etc/postgresql/13/main/postgresql.conf
+
+-- host    all             all             0.0.0.0/0            md5
+sudo nano /etc/postgresql/13/main/pg_hba.conf
+
+sudo pg_ctlcluster 13 main restart
+
+psql -h 13.90.25.231 -U postgres
+
+
+-- Azure SQL
+psql "host=postgres2021.postgres.database.azure.com port=5432 dbname=postgres user=postgres@postgres2021 password=Test1234 sslmode=require"

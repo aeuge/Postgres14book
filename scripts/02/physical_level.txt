@@ -1,0 +1,81 @@
+-- physycal level
+gcloud compute ssh postgres13
+pg_lsclusters
+
+-- add another cluster
+sudo pg_createcluster 13 main2
+sudo nano /etc/postgresql/13/main/postgresql.conf
+sudo su postgres
+cd /var/lib/postgresql/13/main
+ls -la
+ls -l base
+# - command in psql
+# SELECT oid, datname,dattablespace FROM pg_database;
+# CREATE DATABASE book;
+# SELECT * FROM pg_tablespace;
+
+-- make a catalog for new tablespace
+exit
+sudo su
+sudo mkdir /home/postgres
+sudo chown postgres /home/postgres
+sudo su postgres
+cd /home/postgres
+mkdir tmptblspc
+
+psql
+# CREATE tablespace ts location '/home/postgres/tmptblspc';
+-- list of tablespaces
+# \db
+# CREATE DATABASE app TABLESPACE ts;
+# \c app
+-- look for default tablespace
+# \l+ 
+# CREATE TABLE test (i int);
+# CREATE TABLE test2 (i int) TABLESPACE pg_default;
+# SELECT TABLEname, tablespace FROM pg_TABLEs WHERE schemaname = 'public';
+-- change tablespace for TABLE
+# ALTER TABLE test SET TABLESPACE pg_default;
+# SELECT oid, spcname FROM pg_tablespace; -- oid унимальный номер, по кторому можем найти файлы
+# SELECT oid, datname,dattablespace FROM pg_database;
+
+-- WHERE is TABLE
+# SELECT pg_relation_filepath('test2');
+
+-- SHOW size of database
+# SELECT pg_database_size('app');
+
+-- pretty size
+# SELECT pg_size_pretty(pg_database_size('app'));
+
+-- full size of TABLE
+# SELECT pg_size_pretty(pg_total_relation_size('test2'));
+
+-- only size of data
+# SELECT pg_size_pretty(pg_TABLE_size('test2'));
+
+-- ... only indexes
+# SELECT pg_size_pretty(pg_indexes_size('test2'));
+
+-- size of visability map fro TABLE test2
+# SELECT pg_size_pretty(pg_relation_size('test2','vm'));
+
+-- size of tablespace
+# SELECT pg_size_pretty(pg_tablespace_size('ts'));
+
+
+-- open access
+-- uncomment listen_addresses = '*'
+sudo nano /etc/postgresql/13/main/postgresql.conf
+
+-- host    all             all             0.0.0.0/0               md5
+sudo nano /etc/postgresql/13/main/pg_hba.conf:
+
+-- change password
+ALTER USER postgres PASSWORD 'Postgres123#';
+
+-- restart server
+sudo pg_ctlcluster 13 main restart
+
+-- try access
+psql -h 34.66.131.159 -U postgres -W

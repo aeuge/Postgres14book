@@ -1,0 +1,161 @@
+-- HA clusters
+-- PostgresHA GKE 
+
+gcloud beta container --project "celtic-house-266612" clusters create "postgresha" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.19.9-gke.1900" --release-channel "None" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "30" --metadata disable-legacy-endpoints=true --max-pods-per-node "110" --preemptible --num-nodes "3" --enable-stackdriver-kubernetes --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
+
+NAME        LOCATION       MASTER_VERSION   MASTER_IP      MACHINE_TYPE  NODE_VERSION     NUM_NODES  STATUS
+postgresha  us-central1-c  1.19.9-gke.1900  35.194.59.184  e2-medium     1.19.9-gke.1900  3          RUNNING
+
+gcloud container clusters list
+kubectl get nodes
+-- https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl
+-- gcloud container clusters get-credentials postgresha --zone us-central1-c
+
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm install pgsql-ha bitnami/postgresql-ha
+
+
+PostgreSQL can be accessed through Pgpool via port 5432 on the following DNS name FROM within your cluster:
+    pgsql-ha-postgresql-ha-pgpool.default.svc.cluster.local
+Pgpool acts as a load balancer for PostgreSQL and forward read/write connections to the primary node while read-only connections are forwarded to standby nodes.
+To get the password for "postgres" run:
+    export POSTGRES_PASSWORD=$(kubectl get secret --namespace default pgsql-ha-postgresql-ha-postgresql -o jsonpath="{.data.postgresql-password}" | base64 --decode)
+To get the password for "repmgr" run:
+    export REPMGR_PASSWORD=$(kubectl get secret --namespace default pgsql-ha-postgresql-ha-postgresql -o jsonpath="{.data.repmgr-password}" | base64 --decode)
+To connect to your DATABASE run the following command:
+    kubectl run pgsql-ha-postgresql-ha-client --rm --tty -i --restart='Never' --namespace default --image docker.io/bitnami/postgresql-repmgr:11.10.0-debian-10-r55 --env="PGPASSWORD=$POSTGRES_PASSWORD"  \
+       --command -- psql -h pgsql-ha-postgresql-ha-pgpool -p 5432 -U postgres -d postgres
+To connect to your DATABASE FROM outside the cluster execute the following commands:
+    kubectl port-forward --namespace default svc/pgsql-ha-postgresql-ha-pgpool 5432:5432 &
+    psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+
+kubectl get all -A
+kubectl get pods
+kubectl get pv
+kubectl get all -o wide
+gcloud compute disks list
+
+-- extract password
+export POSTGRES_PASSWORD=$(kubectl get secret --namespace default pgsql-ha-postgresql-ha-postgresql -o jsonpath="{.data.postgresql-password}" | base64 --decode)
+echo $POSTGRES_PASSWORD
+kubectl port-forward --namespace default svc/pgsql-ha-postgresql-ha-pgpool 5432:5432
+
+PGPASSWORD=W8gBnN9UEb psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+
+kubectl exec -it pod/pgsql-ha-postgresql-ha-pgpool-56458bdc5d-82kkw -- bash
+cat /opt/bitnami/pgpool/conf/pgpool.conf
+-- http://support.ptc.com/help/thingworx_hc/thingworx_8_hc/ru/index.html#page/ThingWorx/Help/ThingWorxHighAvailability/InstallingandConfiguringPostgreSQLHA.html
+
+
+-- add load balancer
+export POSTGRES_PASSWORD=$(kubectl get secret --namespace default pgsql-ha-postgresql-ha-postgresql -o jsonpath="{.data.postgresql-password}" | base64 --decode)
+export REPMGR_PASSWORD=$(kubectl get secret --namespace "default" pgsql-ha-postgresql-ha-postgresql -o jsonpath="{.data.repmgr-password}" | base64 --decode)
+export ADMIN_PASSWORD=$(kubectl get secret --namespace "default" pgsql-ha-postgresql-ha-pgpool -o jsonpath="{.data.admin-password}" | base64 --decode)
+
+helm upgrade pgsql-ha bitnami/postgresql-ha --set service.type=LoadBalancer --set postgresql.password=$POSTGRES_PASSWORD --set postgresql.repmgrPassword=$REPMGR_PASSWORD --set pgpool.adminPassword=$ADMIN_PASSWORD
+
+export SERVICE_IP=$(kubectl get svc --namespace default pgsql-ha-postgresql-ha-pgpool --template "{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}")
+echo $SERVICE_IP
+PGPASSWORD=W8gBnN9UEb psql -h $SERVICE_IP -p 5432 -U postgres -d postgres
+
+-- 2 case
+PGPASSWORD=$POSTGRES_PASSWORD psql -h $SERVICE_IP -p 5432 -U postgres -d postgres
+
+gcloud container clusters delete postgresha --zone us-central1-c
+
+gcloud compute disks list
+
+
+-- Patroni
+Postgres operator GKE
+
+gcloud beta container --project "celtic-house-266612" clusters create "postgresoperator" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.19.9-gke.1900" --release-channel "None" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "30" --metadata disable-legacy-endpoints=true --max-pods-per-node "110" --preemptible --num-nodes "3" --enable-stackdriver-kubernetes --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
+
+NAME              LOCATION       MASTER_VERSION   MASTER_IP       MACHINE_TYPE  NODE_VERSION     NUM_NODES  STATUS
+postgresoperator  us-central1-c  1.19.9-gke.1900  34.136.139.222  e2-medium     1.19.9-gke.1900  3          RUNNING
+
+-- postgres operator
+kubectl api-resources
+
+git clone https://github.com/zalando/postgres-operator
+cd postgres-operator
+helm install postgres-operator ./charts/postgres-operator
+
+kubectl --namespace=default get pods -l "app.kubernetes.io/name=postgres-operator"
+
+kubectl api-resources | grep postgres
+
+-- install GUI for postgres operator
+helm install postgres-operator-ui ./charts/postgres-operator-ui
+
+-- To verify that postgres-operator has started, run:
+kubectl --namespace=default get pods -l "app.kubernetes.io/name=postgres-operator-ui"
+
+kubectl get all
+kubectl port-forward svc/postgres-operator-ui 8081:80
+
+-- make cluster from UI
+name - minimal
+instances - 2
+галочка на pg_bouncer
+
+-- 
+kubectl get all
+
+
+-- pod/acid-minimal-pooler-5fd6d47fd4-krvlr    0/1     Pending   0          3m1s
+-- pod/acid-minimal-pooler-5fd6d47fd4-twstd    0/1     Pending   0          3m1s
+
+kubectl describe pod/acid-minimal-pooler-5fd6d47fd4-krvlr
+-- Warning  FailedScheduling  61s (x4 over 3m52s)  default-scheduler  0/3 nodes are available: 3 Insufficient cpu.
+
+
+--
+kubectl get nodes
+kubectl top node gke-postgresoperator-default-pool-0a871821-9h9f
+
+--
+kubectl describe node gke-postgresoperator-default-pool-0a871821-9h9f
+
+
+-- decrease limits
+kubectl get deployment
+kubectl edit deployment acid-minimal-pooler
+
+kubectl get all
+
+kubectl port-forward service/acid-minimal-pooler 5432:5432
+
+
+export PGHOST="35.224.211.219"
+export PGPORT="5432"
+
+-- Retrieve the password FROM the K8s Secret that is CREATEd in your cluster. Non-encrypted connections are rejected by default, so set the SSL mode to require:
+
+export PGPASSWORD=$(kubectl get secret postgres.acid-minimal.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
+export PGSSLMODE=require
+
+psql -U postgres -h localhost
+SELECT inet_server_addr();
+\l
+
+kubectl exec -it pod/acid-minimal-0 -- bash
+psql -U postgres
+
+patronictl -c postgres.yml list
+
+-- go to the pooler
+echo $PGPASSWORD
+
+kubectl exec -it pod/acid-minimal-pooler-79d8cd5646-8gw6q -- psql -U postgres -h localhost sslmode=require -W
+
+kubectl exec -it pod/acid-minimal-pooler-79d8cd5646-8gw6q -- sh
+df
+pgbouncer -h
+
+-- kill primary
+kubectl delete pod/acid-minimal-0
+
+
+kubectl exec -it pod/acid-minimal-0 -- patronictl -c postgres.yml list
+

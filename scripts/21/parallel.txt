@@ -1,0 +1,413 @@
+-- cockroachDB in GCE
+-- create 3 VM - cockroach1, cockroach2, cockroach3
+gcloud beta compute --project=celtic-house-266612 instances create cockroach1 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210119a --image-project=ubuntu-os-cloud --boot-disk-size=50GB --boot-disk-type=pd-ssd --boot-disk-device-name=cockroach1 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+gcloud beta compute --project=celtic-house-266612 instances create cockroach2 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210119a --image-project=ubuntu-os-cloud --boot-disk-size=50GB --boot-disk-type=pd-ssd --boot-disk-device-name=cockroach2 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+gcloud beta compute --project=celtic-house-266612 instances create cockroach3 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210119a --image-project=ubuntu-os-cloud --boot-disk-size=50GB --boot-disk-type=pd-ssd --boot-disk-device-name=cockroach3 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute ssh cockroach1
+gcloud compute ssh cockroach2
+gcloud compute ssh cockroach3
+
+-- 21.1.6 stable
+wget -qO- https://binaries.cockroachdb.com/cockroach-v21.1.6.linux-amd64.tgz | tar  xvz && sudo cp -i cockroach-v21.1.6.linux-amd64/cockroach /usr/local/bin/ && sudo mkdir -p /opt/cockroach && sudo chown aeugene:aeugene /opt/cockroach
+
+-- --insecure OR generte certs
+mkdir certs my-safe-directory
+cockroach cert create-ca --certs-dir=certs --ca-key=my-safe-directory/ca.key
+cockroach cert create-node localhost cockroach1 cockroach2 cockroach3 --certs-dir=certs --ca-key=my-safe-directory/ca.key --overwrite
+cockroach cert create-client root --certs-dir=certs --ca-key=my-safe-directory/ca.key
+
+-- list of certs
+cockroach cert list --certs-dir=certs
+
+-- on notebook
+gcloud compute instances list
+scp -r aeugene@34.135.114.75:/home/aeugene/certs /mnt/c/download
+scp -r /mnt/c/download/certs aeugene@34.123.92.244:/home/aeugene
+scp -r /mnt/c/download/certs aeugene@35.192.96.158:/home/aeugene
+
+
+
+-- on node1
+cockroach start --certs-dir=certs --advertise-addr=cockroach1 --join=cockroach1,cockroach2,cockroach3 --cache=.25 --max-sql-memory=.25 --background
+
+
+-- on node2
+chmod 700 certs/*
+ls -l certs/
+cockroach start --certs-dir=certs --advertise-addr=cockroach2 --join=cockroach1,cockroach2,cockroach3 --cache=.25 --max-sql-memory=.25 --background
+
+-- on node 3
+chmod 700 certs/*
+cockroach start --certs-dir=certs --advertise-addr=cockroach3 --join=cockroach1,cockroach2,cockroach3 --cache=.25 --max-sql-memory=.25 --background
+
+-- for more security
+-- https://www.cockroachlabs.com/docs/v21.1/secure-a-cluster.html
+
+-- logs
+tail /home/aeugene/cockroach-data/logs/cockroach.log
+
+-- initialize cluster
+cockroach init --certs-dir=certs --host=cockroach1
+
+-- status
+cockroach node status --certs-dir=certs
+
+cockroach sql --certs-dir=certs
+
+\l
+> CREATE DATABASE bank;
+> USE bank;
+> CREATE TABLE if not exists items (itemname varchar(128) primary key, price decimal(19,4), quantity int);
+> IMPORT INTO items (itemname, price, quantity) CSV DATA ('gs://postgres13/cockroachdb.csv') WITH DELIMITER = E'\t';
+
+> SELECT * FROM items;
+
+> CREATE TABLE test (
+    Region VARCHAR(50),
+    Country VARCHAR(50),
+    ItemType VARCHAR(50),
+    SalesChannel VARCHAR(20),
+    OrderPriority VARCHAR(10),
+    OrderDate VARCHAR(10),
+    OrderID int,
+    ShipDate VARCHAR(10),
+    UnitsSold int,
+    UnitPrice decimal(12,2),
+    UnitCost decimal(12,2),
+    TotalRevenue decimal(12,2),
+    TotalCost decimal(12,2),
+    TotalProfit decimal(12,2)
+);
+-- import 1 000 000 lines, 125Мб
+IMPORT INTO test (Region,Country,ItemType,SalesChannel,OrderPriority,OrderDate,OrderID,ShipDate,UnitsSold,UnitPrice,UnitCost,TotalRevenue,TotalCost,TotalProfit) CSV DATA ('gs://postgres13/1000000SalesRecords.csv') WITH DELIMITER = ',', SKIP = '1';
+
+> SELECT count(*) FROM test WHERE unitssold=124;
+> CREATE index test_idx on test(unitssold);
+> SELECT count(*) FROM test WHERE unitssold=124;
+
+-- kill node
+ps aux | grep cockroach| grep -Ev "grep"
+sudo kill -9 2644
+
+cockroach node status --certs-dir=certs
+
+
+
+-- cockroachDB in GKE 
+
+gcloud beta container --project "celtic-house-266612" clusters create "cockroachdb" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.19.9-gke.1900" --release-channel "None" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "30" --metadata disable-legacy-endpoints=true --max-pods-per-node "110" --preemptible --num-nodes "3" --enable-stackdriver-kubernetes --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
+
+NAME         LOCATION       MASTER_VERSION   MASTER_IP      MACHINE_TYPE  NODE_VERSION     NUM_NODES  STATUS
+cockroachdb  us-central1-c  1.19.9-gke.1900  35.224.180.15  e2-medium     1.19.9-gke.1900  3          RUNNING
+
+git clone https://github.com/cockroachdb/helm-charts
+cd helm-charts/cockroachdb
+
+-- 2 options
+-- helm repo add cockroachdb https://charts.cockroachdb.com/
+-- helm repo update
+
+cat values.yaml
+cat my_values.yaml -- заоверрайтит values.yaml
+
+helm install cockroach . --values my_values.yaml
+
+kubectl get all
+kubectl get pv
+
+kubectl get all -o wide
+
+kubectl run -it --rm cockroach-client --image=cockroachdb/cockroach --restart=Never --command -- ./cockroach sql --insecure --host=cockroach-cockroachdb-public.default
+
+
+
+> SHOW databases;
+> CREATE DATABASE bank;
+> USE bank;
+-- UUID
+> CREATE TABLE bank.accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      balance DECIMAL
+  );
+> INSERT INTO bank.accounts (balance)
+  VALUES
+      (1000.50), (20000), (380), (500), (55000);
+> SELECT * FROM bank.accounts;
+
+kubectl port-forward cockroach-cockroachdb-0 8080
+http://localhost:8080
+
+kubectl top node
+
+-- connect from psql
+kubectl port-forward cockroach-cockroachdb-0 26257
+
+psql -h localhost -p 26257 -U root -d defaultdb
+\l
+> USE bank;
+> SELECT * FROM bank.accounts;
+
+> CREATE TABLE test (
+    Region VARCHAR(50),
+    Country VARCHAR(50),
+    ItemType VARCHAR(50),
+    SalesChannel VARCHAR(20),
+    OrderPriority VARCHAR(10),
+    OrderDate VARCHAR(10),
+    OrderID int,
+    ShipDate VARCHAR(10),
+    UnitsSold int,
+    UnitPrice decimal(12,2),
+    UnitCost decimal(12,2),
+    TotalRevenue decimal(12,2),
+    TotalCost decimal(12,2),
+    TotalProfit decimal(12,2)
+);
+
+> import INTO test (Region,Country,ItemType,SalesChannel,OrderPriority,OrderDate,OrderID,ShipDate,UnitsSold,UnitPrice,UnitCost,TotalRevenue,TotalCost,TotalProfit) CSV DATA ('gs://postgres13/1000000SalesRecords.csv') WITH DELIMITER = ',', SKIP = '1';
+
+
+\timing
+> SELECT count(*) FROM test WHERE unitssold=124;
+> CREATE index test_idx on test(unitssold);
+> SELECT count(*) FROM test WHERE unitssold=124;
+
+-- BACKUP
+BACKUP DATABASE bank TO 'gs://postgres/database-bank-2021-07-28-weekly' AS OF SYSTEM TIME '-10s';
+-- to files only in enterprise
+BACKUP DATABASE bank TO 'file://111.txt' AS OF SYSTEM TIME '-10s';
+
+
+gcloud container clusters delete cockroachdb --zone us-central1-c
+gcloud compute disks list
+
+
+
+-- CITUS in GCE
+-- Создал 3 VM - citus1, citus2, citus3
+-- ssd 100
+gcloud beta compute --project=celtic-house-266612 instances create citus1 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --no-restart-on-failure --maintenance-policy=TERMINATE --preemptible --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210130 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=citus1 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=none
+
+-- on new ubuntu-2010-groovy-v20210720
+gcloud beta compute --project=celtic-house-266612 instances create citus1 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --no-restart-on-failure --maintenance-policy=TERMINATE --preemptible --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210720 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=citus1 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=none
+gcloud beta compute --project=celtic-house-266612 instances create citus2 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --no-restart-on-failure --maintenance-policy=TERMINATE --preemptible --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210720 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=citus2 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=none
+gcloud beta compute --project=celtic-house-266612 instances create citus3 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --no-restart-on-failure --maintenance-policy=TERMINATE --preemptible --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210720 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=citus3 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=none
+
+gcloud compute ssh citus1
+gcloud compute ssh citus2
+gcloud compute ssh citus3
+
+-- https://docs.citusdata.com/en/stable/installation/single_machine_debian.html#post-install
+
+-- https://docs.citusdata.com/en/stable/installation/multi_machine_debian.html#steps-to-be-executed-on-all-nodes
+
+
+-- Steps to be executed on all nodes
+-- 1. Add repository
+-- sudo apt update && sudo apt upgrade -y
+-- Add Citus repository for package manager
+curl https://install.citusdata.com/community/deb.sh | sudo bash
+
+-- 2. Install PostgreSQL + Citus and initialize a database
+sudo apt-get -y install postgresql-13-citus-10.1
+
+-- error
+cd /etc/apt/sources.list.d
+sudo nano citusdata_community.list
+groovy --> focal
+sudo apt update
+sudo apt-get -y install postgresql-13-citus-10.1
+pg_lsclusters 
+
+-- on 2 & 3 nodes
+curl https://install.citusdata.com/community/deb.sh | sudo bash && cd /etc/apt/sources.list.d && sudo nano citusdata_community.list
+groovy --> focal
+sudo apt update && sudo apt-get -y install postgresql-13-citus-10.1
+
+
+-- on 1,2 & 3 nodes
+-- preload citus extension
+sudo pg_conftool 13 main set shared_preload_libraries citus
+
+-- This installs centralized configuration in /etc/postgresql/13/main, and creates a database in /var/lib/postgresql/13/main.
+-- 3. Configure connection and authentication
+sudo pg_conftool 13 main set listen_addresses '*'
+
+sudo nano /etc/postgresql/13/main/pg_hba.conf
+host  all all 10.128.0.0/16            trust
+host    all             all             127.0.0.1/32            trust -- только на контроллере
+host    all             all             0.0.0.0/0            md5  -- только на контроллере
+
+sudo service postgresql restart
+# and make it start automatically when computer does
+sudo update-rc.d postgresql enable
+
+
+# add the citus extension - экстеншн ставится для конкретной БД !!
+sudo -i -u postgres psql -c "CREATE EXTENSION citus;"
+
+-- activate nodes on coordinator node
+sudo -i -u postgres psql -c "SELECT * FROM master_add_node('citus2', 5432);"
+sudo -i -u postgres psql -c "SELECT * FROM master_add_node('citus3', 5432);"
+
+sudo -i -u postgres psql -c "SELECT * FROM master_get_active_worker_nodes();"
+
+-- for remove node from cluster
+-- SELECT master_remove_node('citus1', 5432);
+
+sudo -i -u postgres psql
+\l
+CREATE DATABASE bank;
+-- NOTICE:  Citus partially supports create DATABASE for distributed databases
+-- DETAIL:  Citus does not propagate create DATABASE command to workers
+-- HINT:  You can manually create a DATABASE and its extensions on workers. !!!
+
+\c bank
+CREATE EXTENSION citus;
+
+CREATE TABLE accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      balance DECIMAL
+);
+INSERT INTO accounts (balance)
+  VALUES
+      (1000.50), (20000), (380), (500), (55000);
+
+\dt
+SELECT * FROM accounts;
+
+
+SELECT * FROM master_get_active_worker_nodes();
+
+-- https://docs.citusdata.com/en/stable/get_started/tutorial_multi_tenant.html#data-model-and-sample-data
+-- before distributing tables, enable some extra features
+SELECT create_distributed_table('accounts', 'id');
+-- error
+SELECT * FROM master_add_node('citus2', 5432);
+SELECT * FROM master_add_node('citus3', 5432);
+SELECT create_distributed_table('accounts', 'id');
+
+SELECT * FROM pg_dist_shard;
+
+\dt+
+SELECT * FROM accounts_102071;
+
+
+-- add 4 node
+gcloud beta compute --project=celtic-house-266612 instances create citus4 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --no-restart-on-failure --maintenance-policy=TERMINATE --preemptible --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2010-groovy-v20210720 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=citus4 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=none
+gcloud compute ssh citus4
+curl https://install.citusdata.com/community/deb.sh | sudo bash && cd /etc/apt/sources.list.d && sudo nano citusdata_community.list
+groovy --> focal
+sudo apt update && sudo apt-get -y install postgresql-13-citus-10.1
+sudo pg_conftool 13 main set shared_preload_libraries citus
+
+sudo pg_conftool 13 main set listen_addresses '*'
+
+sudo nano /etc/postgresql/13/main/pg_hba.conf
+-- 10.128.0.0/16            trust
+
+sudo service postgresql restart
+-- and make it start automatically when computer does
+sudo update-rc.d postgresql enable
+
+sudo -i -u postgres psql
+
+CREATE DATABASE bank;
+\c bank
+CREATE EXTENSION citus;
+
+-- add 4 node on coordinator
+SELECT * FROM master_add_node('citus4', 5432);
+
+-- rebalance
+SELECT rebalance_table_shards('accounts');
+
+-- to logs
+cat /var/log/postgresql/postgresql-13-main.log
+
+
+SHOW citus.shard_replication_factor;
+
+
+-- bigquery
+SELECT count(*) FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`;
+
+sudo su postgres
+gcloud config list
+bq show bigquery-public-data:chicago_taxi_trips.taxi_trips
+bq extract bigquery-public-data:chicago_taxi_trips.taxi_trips gs://postgres13/chicago/taxi.csv.*
+exit
+-- install gcsfuse
+-- https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/installing.md
+
+export GCSFUSE_REPO=gcsfuse-`lsb_release -c -s`
+echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+cd /etc/apt/sources.list.d
+sudo nano gcsfuse.list
+sudo apt update && sudo apt-get -y install gcsfuse
+
+
+sudo su postgres
+cd $HOME
+mkdir gcsfuse
+cd gcsfuse
+gcsfuse postgres13 .
+-- for umount 
+-- fusermount -u 
+
+ls -l
+cd ..
+cd gcsfuse
+mkdir chicago
+cd chicago
+ls -l
+
+
+psql
+\c bank
+CREATE TABLE taxi_trips(unique_key text
+,taxi_id text
+,trip_start_timestamp timestamp
+,trip_end_timestamp timestamp
+,trip_seconds bigint
+,trip_miles float
+,pickup_census_tract bigint
+,dropoff_census_tract bigint
+,pickup_community_area bigint
+,dropoff_community_area bigint
+,fare float
+,tips float
+,tolls float
+,extras float
+,trip_total float
+,payment_type text
+,company text
+,pickup_latitude float
+,pickup_longitude float
+,pickup_location text
+,dropoff_latitude float
+,dropoff_longitude float
+,dropoff_location text);
+
+date && for f in *.csv*; do psql -d bank -c "\\COPY taxi_trips FROM PROGRAM 'cat $f' CSV HEADER"; done && date
+
+psql
+\c bank
+\timing
+
+SELECT create_distributed_table('taxi_trips', 'unique_key');
+
+SELECT payment_type, round(sum(tips)/sum(tips+fare)*100) tips_persent, count(*)
+FROM taxi_trips
+group by payment_type
+order by 3 desc;
+
+
+
+gcloud compute instances delete citus4
+gcloud compute instances delete citus3
+gcloud compute instances delete citus2
+gcloud compute instances delete citus1

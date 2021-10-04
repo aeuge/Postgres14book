@@ -1,0 +1,12 @@
+--9tvGLCXfuZBQbDf
+psql -h 104.154.255.84 -U postgres
+\l
+
+wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+chmod +x cloud_sql_proxy
+./cloud_sql_proxy -instances=celtic-house-266612:us-central1:cloudsql=tcp:5432
+
+psql -h localhost -U postgres
+
+-- connect to 2 instances
+/cloud_sql_proxy -instances=myProject:us-central1:myInstance=tcp:5432,myProject:us-central1:myInstance2=tcp:1234

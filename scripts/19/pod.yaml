@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hello-demo
+  labels:
+    app: hello-demo
+spec:
+  containers:
+  - name: hello-demo
+    image: aristoveugene/hello-py:v1
+    ports:
+      - containerPort: 80
+

@@ -1,0 +1,43 @@
+-- compute cloud
+ssh aeugene@84.201.139.215
+
+sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt-get -y install postgresql && sudo apt install unzip
+pg_lsclusters
+
+sudo -u postgres psql
+\password
+-- test123
+exit
+
+sudo pg_conftool 13 main set listen_addresses '*'
+echo "host    all             all             0.0.0.0/0            md5" | sudo tee --append /etc/postgresql/13/main/pg_hba.conf
+
+sudo pg_ctlcluster 13 main restart
+
+psql -h 84.201.139.215 -U postgres
+
+
+-- Yandex Managed Service for PostgreSQL
+-- test1234
+mkdir -p ~/.postgresql && \
+wget "https://storage.yandexcloud.net/cloud-certs/CA.pem" -O ~/.postgresql/root.crt && \
+chmod 0600 ~/.postgresql/root.crt
+
+
+psql "host=rc1a-gg2psk4u3vf6t2wm.mdb.yandexcloud.net,rc1b-uo2dph2fo20jkugj.mdb.yandexcloud.net,rc1c-4gs18rfd7vhq6lrk.mdb.yandexcloud.net \
+      port=6432 \
+      sslmode=verify-full \
+      dbname=db1 \
+      user=user1 \
+      target_session_attrs=read-write"
+
+
+pg_dump "host=rc1a-gg2psk4u3vf6t2wm.mdb.yandexcloud.net,rc1b-uo2dph2fo20jkugj.mdb.yandexcloud.net,rc1c-4gs18rfd7vhq6lrk.mdb.yandexcloud.net \
+      port=6432 \
+      sslmode=verify-full \
+      dbname=db1 \
+      user=user1 \
+      target_session_attrs=read-write"
+
+
+       

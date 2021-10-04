@@ -1,0 +1,31 @@
+# stats
+SELECT * FROM pg_stat_database WHERE datname = 'demo';
+
+\c demo
+SELECT * FROM pg_stats WHERE tablename = 'flights' \gx
+
+CREATE TABLE t1 (
+    a   int,
+    b   int
+);
+
+INSERT INTO t1 SELECT i/100, i/500
+                 FROM generate_series(1,1000000) s(i);
+
+ANALYZE t1;
+
+-- the number of matching rows will be drastically underestimated:
+EXPLAIN ANALYZE SELECT * FROM t1 WHERE (a = 1) AND (b = 0);
+
+CREATE STATISTICS s1 (dependencies) ON a, b FROM t1;
+
+ANALYZE t1;
+
+-- now the row count estimate is more accurate:
+EXPLAIN ANALYZE SELECT * FROM t1 WHERE (a = 1) AND (b = 0);
+
+SELECT * FROM pg_stat_activity;
+
+SELECT * FROM pg_stat_user_tables WHERE relname = 'flights' \gx
+
+SELECT * FROM pg_stat_user_indexes WHERE relname = 'flights' \gx

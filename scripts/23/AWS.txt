@@ -1,0 +1,25 @@
+-- EC2
+mv test.pem $HOME
+chmod 700 test.pem
+ssh -i test.pem ubuntu@ec2-18-219-24-181.us-east-2.compute.amazonaws.com
+
+sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt-get -y install postgresql && sudo apt install unzip
+pg_lsclusters
+sudo -u postgres psql
+\password
+-- test123
+exit
+-- listener = '*'
+sudo nano /etc/postgresql/13/main/postgresql.conf
+
+-- host    all             all             0.0.0.0/0            md5
+sudo nano /etc/postgresql/13/main/pg_hba.conf
+
+sudo pg_ctlcluster 13 main restart
+
+psql -h 18.219.24.181 -U postgres
+psql -h ec2-18-219-24-181.us-east-2.compute.amazonaws.com -U postgres
+
+
+-- RDS
+psql -h database-1.cmiecfzpuord.us-east-2.rds.amazonaws.com -U postgres

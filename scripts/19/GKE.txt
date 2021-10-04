@@ -1,0 +1,184 @@
+-- GKE & Postgres
+-- simple pod
+cat pod.yaml
+-- simple replicaset
+cat rs.yaml
+
+-- apply config for replicaset
+kubectl apply -f rs.yaml
+kubectl get all
+
+kubectl delete pod hello-rs-demo-9b7rp
+kubectl get all
+
+-- show labels
+kubectl get pods --show-labels
+
+-- delete label
+kubectl label pod hello-rs-demo-9cdsp app-
+kubectl get pods --show-labels
+
+-- look inside pod
+kubectl describe pod hello-rs-demo-9cdsp
+
+-- delete replicaset
+kubectl delete rs hello-rs-demo
+
+-- delete pod
+kubectl delete pod hello-rs-demo-9cdsp
+
+
+-- deployment
+cat deployment.yaml
+kubectl apply -f deployment.yaml
+kubectl get all
+
+
+kubectl set image deployment/hello-deployment hello-py=aristoveugene/hello-py:v2 --record
+kubectl get all
+
+-- view history
+kubectl rollout history deployment/hello-deployment
+
+-- rollback deployment
+kubectl rollout undo deployment hello-deployment
+kubectl get all
+
+-- increase number of replicas
+kubectl scale deployment hello-deployment --replicas=4
+kubectl get all
+
+kubectl delete deployment hello-deployment
+
+-- service
+cat service.yaml
+
+kubectl apply -f deployment.yaml -f service.yaml
+kubectl get all
+
+-- you can forward the port to the host machine
+kubectl port-forward svc/hello-service 10000:9000
+curl http://127.0.0.1:10000/
+
+-- Service discovery
+kubectl run -it --rm busybox --image=busybox
+env | grep HELLO
+
+wget -qO- http://hello-service.default:9000/
+
+--namespace
+kubectl get all -A
+
+-- INGRESS
+-- install with helm
+cat nginx-ingress.yaml
+kubectl create namespace monitoring
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx/
+helm repo update
+helm install nginx ingress-nginx/ingress-nginx --namespace monitoring -f nginx-ingress.yaml
+kubectl get all -n monitoring
+
+-- add ingress
+cat ingress.yaml
+kubectl apply -f ingress.yaml
+kubectl get ing
+
+-- if we use URL - 404, because we have no Host, only IP
+minikube ip
+curl http://192.168.1.73/myapp
+
+curl -H 'Host: hello.world' http://192.168.1.73/myapp
+
+-- add string to the host file
+sudo nano /etc/hosts
+curl http://hello.world/myapp
+
+
+-- STATEFULSETS
+
+kubectl delete all --all
+
+-- make stateful set 
+cat postgres.yaml
+ccat postgres.yaml
+
+-- now we have no persistent volume 
+kubectl get pv
+
+-- no persistent volume claim 
+kubectl get pvc
+
+kubectl apply -f postgres.yaml
+
+kubectl get all
+
+-- now we have persistent volume and pvc 
+kubectl get pv
+kubectl get pvc
+
+-- now we can connect to DB with container ENV 
+env:
+          - name: POSTGRES_DB
+            value: myapp
+          - name: POSTGRES_USER
+            value: myuser
+          - name: POSTGRES_PASSWORD
+            value: passwd
+
+psql -h 192.168.1.73 -p 31321 -U myuser -W myapp
+
+-- If we delete the pod, it will still be created, and the data will still be available
+kubectl delete pod postgres-statefulset-0
+
+kubectl get all
+
+psql -h 192.168.1.73 -p 31321 -U myuser -W myapp
+
+-- even if the statefulset is deleted, the data will remain in place
+kubectl delete -f postgres.yaml
+
+kubectl get pvc
+kubectl get pv
+
+
+
+-- GKE
+gcloud beta container --project "celtic-house-266612" clusters create "postgres" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.19.9-gke.1900" --release-channel "None" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "30" --metadata disable-legacy-endpoints=true --max-pods-per-node "110" --preemptible --num-nodes "3" --enable-stackdriver-kubernetes --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
+
+gcloud container clusters list
+
+
+cat postgres-configmap.yaml
+-- on default ReadWriteMany not worked
+-- change to the ReadWriteOnce
+-- rewrite mount to the local storage /mnt/data
+-- remove storage mode
+nano postgres-storage.yaml
+
+cat postgres-storage.yaml
+nano postgres-deployment.yaml
+cat postgres-service.yaml
+
+
+kubectl apply -f postgres-configmap.yaml -f postgres-storage.yaml -f postgres-deployment.yaml -f postgres-service.yaml
+
+kubectl get all
+
+kubectl exec -it pod/postgres-86d8848dd8-fdf7q bash
+df
+-- /dev/sdb 5гб
+psql -U postgresadmin -d postgres
+CREATE DATABASE test;
+\l
+
+
+kubectl port-forward service/postgres 5432:5432
+
+-- for access from outside use LoadBalancer. NodePort only for inside GCP
+cat postgres-service2.yaml
+kubectl apply -f postgres-service2.yaml
+psql -h 35.222.104.155 -U postgresadmin -W -d postgresdb
+\l
+
+kubectl delete all --all && kubectl delete pvc --all && kubectl delete cm --all && kubectl delete secrets --all
+

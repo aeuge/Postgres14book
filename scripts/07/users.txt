@@ -1,0 +1,79 @@
+-- Users
+
+SELECT rolname FROM pg_roles;
+SELECT usename, usesuper FROM pg_catalog.pg_user;
+\du
+
+CREATE ROLE test;
+SELECT * FROM pg_catalog.pg_user;
+
+ALTER USER test LOGIN;
+\c - test
+
+-- error
+
+-- now peer authentication with unix socket, but in unix we have not user test
+-- enable password by setting peer -> md5
+nano /etc/postgresql/13/main/pg_hba.conf
+pg_ctlcluster restart 13 main
+
+-- set password
+\password test
+or
+ALTER USER test PASSWORD 'pass$123';
+
+\c - test
+\dt
+SELECT * FROM t;
+
+-- create new user with NOLOGIN
+CREATE USER test2 WITH PASSWORD 'pass$123' NOLOGIN;
+\c - test2
+
+--
+CREATE DATABASE testdb;
+\c testdb
+CREATE SCHEMA testnm;
+CREATE TABLE t1(c1 integer);
+INSERT INTO t1 VALUES (1);
+
+CREATE ROLE readonly;
+GRANT CONNECT ON DATABASE testdb TO readonly;
+GRANT USAGE ON SCHEMA testnm TO readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA testnm TO readonly;
+
+CREATE USER testread WITH PASSWORD 'test123';
+GRANT readonly TO testread;
+\c testdb testread
+SELECT * FROM t1;
+\dt
+
+\c testdb postgres
+DROP TABLE t1;
+CREATE TABLE testnm.t1(c1 integer);
+INSERT INTO testnm.t1 VALUES (1);
+SELECT * FROM testnm.t1;
+
+\c testdb postgres;
+ALTER DEFAULT PRIVILEGES IN SCHEMA testnm GRANT SELECT ON TABLES TO readonly; 
+\c testdb testread;
+SELECT * FROM testnm.t1;
+
+CREATE TABLE t2(c1 integer); 
+INSERT INTO t2 VALUES (2);
+
+\c testdb postgres; 
+REVOKE CREATE ON SCHEMA public FROM public; 
+REVOKE ALL ON DATABASE testdb FROM public; 
+\c testdb testread;
+
+CREATE TABLE t3(c1 integer); 
+CREATE TEMP TABLE t3(c1 integer);
+
+
+
+
+
+
+
+

@@ -1,0 +1,80 @@
+-- transaction isolation level
+-- create test table
+\c app
+CREATE TABLE testA (i serial, amount int);
+INSERT INTO testA(amount) VALUES (100), (500);
+SELECT * FROM testA;
+
+\echo :AUTOCOMMIT
+\set AUTOCOMMIT OFF
+SHOW TRANSACTION ISOLATION LEVEL;
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+
+-- test TRANSACTION ISOLATION LEVEL READ COMMITTED;
+-- 1 console
+BEGIN;
+SELECT * FROM testA;
+
+-- 2 consoleapp=# 
+BEGIN;
+UPDATE testA set amount = 555 WHERE i = 1;
+COMMIT;
+
+-- 1 console
+SELECT * FROM testA; -- different values
+
+
+
+-- TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+-- 1 console
+BEGIN;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+-- WARNING:  there is already a transaction in progress
+SELECT * FROM testA;
+ i | amount
+---+--------
+ 2 |    500
+ 1 |    555
+(2 rows)
+
+-- 2 console
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+INSERT INTO testA VALUES (777);
+COMMIT;
+
+-- 1 console
+SELECT * FROM testA;
+ i | amount
+---+--------
+ 2 |    500
+ 1 |    555
+(2 rows)
+
+
+
+-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+DROP TABLE IF EXISTS testS;
+CREATE TABLE testS (i int, amount int);
+INSERT INTO TESTS VALUES (1,10), (1,20), (2,100), (2,200); 
+COMMIT;
+
+-- 1 console
+BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+SELECT sum(amount) FROM testS WHERE i = 1;
+INSERT INTO testS VALUES (2,30);
+
+-- 2 consol
+BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+SELECT sum(amount) FROM testS WHERE i = 2;
+INSERT INTO testS VALUES (1,200);
+
+-- 1 console 
+COMMIT;
+
+-- 2 console 
+COMMIT;

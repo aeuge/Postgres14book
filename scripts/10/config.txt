@@ -1,0 +1,43 @@
+#  config lecture
+SHOW config_file;
+sudo pg_ctlcluster 13 main stop
+sudo mv /var/lib/postgresql/13/main /var/lib/postgresql/13/maintest
+
+-- errors
+sudo pg_ctlcluster 13 main start
+sudo pg_ctlcluster 13 main start -D /var/lib/postgresql/13/maintest
+
+sudo nano /etc/postgresql/13/main/postgresql.conf
+
+
+-- pg_settings
+SELECT count(*) FROM pg_settings;
+\d+ pg_settings
+SELECT * FROM pg_settings LIMIT 1 \gx
+
+SELECT * FROM pg_settings WHERE name = 'work_mem';
+SHOW work_mem;
+SELECT unit, count(*) FROM pg_settings GROUP BY unit ORDER BY 2 desc;
+SELECT context, count(*) FROM pg_settings GROUP BY context ORDER BY 2 desc;
+SELECT category, count(*) FROM pg_settings GROUP BY category ORDER BY 2 desc;
+SELECT source, count(*) FROM pg_settings GROUP BY source ORDER BY 2 desc;
+
+-- get current value 
+SELECT setting||' x '||coalesce(unit,'units') FROM pg_settings WHERE name='shared_buffers';
+SELECT setting||' x '||coalesce(unit,'units') FROM pg_settings WHERE name='max_connections';
+SHOW max_connections;
+SELECT current_setting('max_connections');
+
+-- pg_file_settings
+SELECT count(*) from pg_file_settings;
+SELECT sourcefile, count(*) FROM pg_file_settings GROUP BY sourcefile;
+SELECT * FROM pg_file_settings WHERE sourcefile='/var/lib/postgresql/13/maintest/postgresql.auto.conf';
+
+
+-- tuning
+sudo apt install libdbd-pg-perl libdbi-perl perl-modules -y
+sudo su postgres
+cd $HOME
+wget -O postgresqltuner.pl https://postgresqltuner.pl
+chmod +x postgresqltuner.pl
+./postgresqltuner.pl --host=/var/run/postgresql

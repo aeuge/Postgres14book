@@ -1,0 +1,25 @@
+# psql
+sudo su postgres
+psql
+\c app
+\dt
+SELECT * FROM test;
+exit
+cd $HOME
+pwd
+ls -l 
+mkdir scripts
+cd scripts
+nano select.sql
+-------
+\c app
+\dt
+SELECT * FROM test;
+-------
+psql
+\i /var/lib/postgresql/scripts/select.sql
+
+SELECT * FROM pg_stat_activity;
+\x
+SELECT * FROM pg_stat_activity;
+\x

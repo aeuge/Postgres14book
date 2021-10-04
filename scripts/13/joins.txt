@@ -1,0 +1,323 @@
+
+CREATE DATABASE joins;
+\c joins
+CREATE TABLE a (city_name varchar, country varchar);
+INSERT INTO a (city_name, country) VALUES
+('Tokyo','Japan'),
+('New York','USA'),
+('Fukuoka','Japan'),
+('Shanghai','China');
+
+CREATE TABLE b (city_name varchar, godzilla_attacks int);
+INSERT INTO b (city_name, godzilla_attacks) VALUES
+('Fukuoka',3),
+('Nagoya',2),
+('New York',3),
+('Tokai',3),
+('Tokyo',13),
+('Yokohama',2);
+
+-- inner joins
+SELECT a.city_name, b.godzilla_attacks
+FROM a
+JOIN b on a.city_name = b.city_name;
+
+ -- or
+SELECT a.city_name, b.godzilla_attacks
+FROM a
+INNER JOIN b on a.city_name = b.city_name;
+
+-- or
+SELECT a.city_name, b.godzilla_attacks
+FROM a, b 
+where a.city_name = b.city_name;
+
+-- left
+SELECT a.city_name, b.godzilla_attacks
+FROM a
+LEFT JOIN b on a.city_name = b.city_name;
+
+-- or
+SELECT a.city_name, b.godzilla_attacks
+FROM a
+LEFT OUTER JOIN b on a.city_name = b.city_name;
+
+-- or
+SELECT a.city_name, b.godzilla_attacks
+FROM b
+RIGHT JOIN a on a.city_name = b.city_name;
+
+-- left where b.key is null
+SELECT a.city_name, b.godzilla_attacks
+FROM a
+LEFT JOIN b on a.city_name = b.city_name 
+WHERE b.city_name is null;
+
+-- full
+SELECT a.country, a.city_name, b.city_name, b.godzilla_attacks
+FROM a
+FULL JOIN b on a.city_name = b.city_name;
+
+-- full exclude inner
+SELECT a.country, a.city_name, b.city_name, b.godzilla_attacks
+FROM a
+FULL JOIN b on a.city_name = b.city_name
+WHERE a.city_name IS NULL OR b.city_name IS NULL;
+
+-- cross
+SELECT a.country, a.city_name, b.city_name, b.godzilla_attacks
+FROM a
+CROSS JOIN b;
+
+
+-- lateral
+SELECT b.city_name, (SELECT a.country FROM a WHERE a.city_name = b.city_name)
+FROM b;
+
+
+SELECT b.city_name
+FROM b
+JOIN (SELECT a.country FROM a) as foo on true;
+
+SELECT b.city_name
+FROM b
+JOIN (SELECT a.country FROM a WHERE a.city_name = b.city_name) as foo on true;
+
+SELECT b.city_name, foo.country
+FROM b
+JOIN LATERAL (SELECT a.country FROM a WHERE a.city_name = b.city_name) as foo on true;
+
+-- union
+SELECT a.country as c, a.city_name as n
+FROM a
+UNION
+SELECT 'RUSSIA' as c, b.city_name as n
+FROM b
+UNION
+SELECT 'USA' as c, a.city_name as n
+FROM a;
+
+-- union all
+SELECT a.country as c, a.city_name as n
+FROM a
+UNION ALL
+SELECT 'RUSSIA' as c, b.city_name as n
+FROM b
+UNION ALL
+SELECT 'USA' as c, a.city_name as n
+FROM a;
+
+-- Except
+SELECT a.city_name as n
+FROM a
+EXCEPT ALL
+SELECT b.city_name as n
+FROM b;
+
+EXPLAIN SELECT a.city_name as n
+FROM a
+EXCEPT ALL
+SELECT b.city_name as n
+FROM b;
+
+SELECT a.city_name
+FROM a
+LEFT JOIN b on a.city_name = b.city_name 
+WHERE b.city_name is null;
+
+EXPLAIN SELECT a.city_name
+FROM a
+LEFT JOIN b on a.city_name = b.city_name 
+WHERE b.city_name is null;
+
+-- intersect
+SELECT a.city_name as n
+FROM a
+INTERSECT ALL
+SELECT b.city_name as n
+FROM b;
+
+-- insane join
+SELECT a.city_name, b.city_name, b.godzilla_attacks
+FROM a
+LEFT JOIN b on (a.country = 'USA' AND b.godzilla_attacks = 2) OR b.godzilla_attacks = 13;
+
+
+-- demo avia bookings 
+sudo su postgres
+cd $HOME
+wget --quiet https://edu.postgrespro.ru/demo_small.zip
+unzip demo_small.zip
+psql < demo_small.sql
+psql
+\c demo
+\dt+
+
+\l+
+
+\dn
+
+\dt+ bookings.*
+
+-- build a list of flights
+SELECT  flight_no
+FROM bookings.flights 
+limit 10;
+
+-- add the flight date without time
+SELECT  flight_no
+		, scheduled_departure::date as vilet
+FROM bookings.flights 
+limit 10;
+
+-- add the departure airport
+SELECT  f.flight_no
+		, f.scheduled_departure::date as vilet
+		, a1.airport_name as FROM
+FROM bookings.flights f
+JOIN bookings.airports as a1 
+	on a1.airport_code = f.departure_airport
+limit 10;
+
+-- add the arrival airport and sort by departure date
+SELECT  f.flight_no
+		, f.scheduled_departure::date as vilet
+		, a1.airport_name as from_air
+		, a2.airport_name as to_air
+FROM bookings.flights f
+JOIN bookings.airports as a1 
+	on a1.airport_code = f.departure_airport
+JOIN bookings.airports as a2 
+	on a2.airport_code = f.arrival_airport
+order by vilet
+limit 10;
+
+-- count the number of tickets sold
+-- SELECT * FROM bookings.ticket_flights tf WHERE tf.flight_id = 61;
+
+SELECT  f.flight_no
+		, f.scheduled_departure::date as vilet
+		, a1.airport_name as from_air
+		, a2.airport_name as to_air
+		, count(tf.ticket_no)
+FROM bookings.flights f
+JOIN bookings.airports as a1 
+	ON a1.airport_code = f.departure_airport
+JOIN bookings.airports as a2 
+	ON a2.airport_code = f.arrival_airport
+LEFT JOIN bookings.ticket_flights tf 
+	ON tf.flight_id = f.flight_id
+GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air
+ORDER BY vilet
+LIMIT 10;
+
+-- calculate the capacity
+EXPLAIN ANALYZE
+SELECT  f.flight_no
+		, f.scheduled_departure::date as vilet
+		, a1.airport_name as from_air
+		, a2.airport_name as to_air
+		, count(s.seat_no)
+		, count(tf.ticket_no)
+FROM bookings.flights f
+JOIN bookings.airports as a1 
+	ON a1.airport_code = f.departure_airport
+JOIN bookings.airports as a2 
+	ON a2.airport_code = f.arrival_airport
+JOIN bookings.seats as s 
+	ON s.aircraft_code = f.aircraft_code
+LEFT JOIN bookings.ticket_flights tf 
+	ON tf.flight_id = f.flight_id
+GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air
+ORDER BY vilet
+LIMIT 10;
+
+--- very bad query. Why?
+
+-- let`s optimize
+-- 1 option
+EXPLAIN ANALYZE WITH vsego AS (
+	SELECT count(s.seat_no) as c, s.aircraft_code
+	FROM bookings.seats s
+	GROUP BY aircraft_code
+)
+SELECT  f.flight_no
+		, f.scheduled_departure::date as vilet
+		, a1.airport_name as from_air
+		, a2.airport_name as to_air
+		, v.c as vsego_mest
+		, count(tf.ticket_no)
+FROM bookings.flights f
+JOIN bookings.airports as a1 
+	ON a1.airport_code = f.departure_airport
+JOIN bookings.airports as a2 
+	ON a2.airport_code = f.arrival_airport
+JOIN vsego as v 
+  ON v.aircraft_code = f.aircraft_code
+LEFT JOIN bookings.ticket_flights tf 
+	ON tf.flight_id = f.flight_id
+GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air, v.c
+ORDER BY vilet
+LIMIT 10;
+
+-- 2 option
+SELECT  f.flight_no
+		, f.scheduled_departure::date AS vilet
+		, a1.airport_name AS from_air
+		, a2.airport_name AS to_air
+		, (SELECT count(*) FROM bookings.seats AS s WHERE s.aircraft_code = f.aircraft_code) AS vsego_mest
+		, count(tf.ticket_no)
+FROM bookings.flights f
+JOIN bookings.airports AS a1 
+	ON a1.airport_code = f.departure_airport
+JOIN bookings.airports AS a2 
+	ON a2.airport_code = f.arrival_airport
+LEFT JOIN bookings.ticket_flights tf 
+	ON tf.flight_id = f.flight_id
+GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air
+ORDER BY vilet
+LIMIT 10;
+
+-- at the end
+SELECT  f.flight_no
+		, f.scheduled_departure::date AS vilet
+		, a1.airport_name AS from_air
+		, a2.airport_name AS to_air
+		, (SELECT count(*) FROM bookings.seats AS s WHERE s.aircraft_code = f.aircraft_code) AS vsego_mest
+		, (SELECT count(*) FROM bookings.ticket_flights AS tf WHERE tf.flight_id = f.flight_id) AS zanyato_mest
+FROM bookings.flights f
+JOIN bookings.airports AS a1 
+	ON a1.airport_code = f.departure_airport
+JOIN bookings.airports AS a2 
+	ON a2.airport_code = f.arrival_airport
+ORDER BY vilet
+LIMIT 10;
+
+-- the fastest option. any ideas?
+WITH vsego AS (
+	SELECT count(s.seat_no) as c, s.aircraft_code
+	FROM bookings.seats s
+	group by aircraft_code
+),
+zanyato AS (
+	SELECT count(tf.flight_id) as c, tf.flight_id
+	FROM bookings.ticket_flights tf
+	group by flight_id
+)
+SELECT  f.flight_no
+		, f.scheduled_departure::date as vilet
+		, a1.airport_name as from_air
+		, a2.airport_name as to_air
+		, v.c as vsego_mest
+		, coalesce(z.c, 0) as zanyato
+FROM bookings.flights f
+JOIN bookings.airports as a1 
+	ON a1.airport_code = f.departure_airport
+JOIN bookings.airports as a2 
+	ON a2.airport_code = f.arrival_airport
+JOIN vsego as v 
+	ON v.aircraft_code = f.aircraft_code
+LEFT JOIN zanyato z
+	ON z.flight_id = f.flight_id
+ORDER BY vilet
+LIMIT 10;

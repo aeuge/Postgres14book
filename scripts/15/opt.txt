@@ -1,0 +1,76 @@
+# optimize
+https://www.percona.com/doc/percona-monitoring-and-management/2.x/install/docker-setting-up.html
+-- on client
+sudo apt I pmm2-client
+
+top/htop
+iostat –dx
+iostat –x
+
+SELECT now() - query_start as "runtime", usename, datname, waiting, state, query 
+FROM pg_stat_activity 
+WHERE now() - query_start > '5 seconds'::interval and state='active' 
+ORDER BY runtime DESC;
+
+-- for kill pid
+-- for active
+SELECT pg_cancel_backend(procpid); 
+-- for idle
+SELECT pg_terminate_backend(procpid);
+
+-- hold transaction
+SELECT pid, xact_start, now() - xact_start AS duration 
+FROM pg_stat_activity 
+WHERE state LIKE '%transaction%' 
+ORDER BY duration DESC;
+
+-- top CPU
+SELECT substring(query, 1, 50) AS short_query, round(total_time::numeric, 2) AS total_time, 
+    calls, rows, round(total_time::numeric / calls, 2) AS avg_time, 
+    round((100 * total_time / sum(total_time::numeric) OVER ())::numeric, 2) AS percentage_cpu 
+FROM pg_stat_statements 
+ORDER BY total_time DESC LIMIT 20;
+
+
+-- top TIME
+SELECT substring(query, 1, 100) AS short_query, round(total_time::numeric, 2) AS total_time, calls, 
+    rows, round(total_time::numeric / calls, 2) AS avg_time, 
+    round((100 * total_time / sum(total_time::numeric) OVER ())::numeric, 2) AS percentage_cpu 
+FROM pg_stat_statements 
+ORDER BY avg_time DESC LIMIT 20;
+
+-- seq scan
+SELECT schemaname, relname, seq_scan, seq_tup_read, seq_tup_read / seq_scan AS avg, idx_scan
+FROM pg_stat_user_tables
+WHERE seq_scan > 0
+ORDER BY seq_tup_read DESC
+LIMIT 25;
+
+
+-- memcache
+shared_preload_libraries = 'pgmemcache'
+CREATE EXTENSION pgmemcache;
+memcache_server_add('hostname:port'::TEXT)
+memcache_add(key::TEXT, value::TEXT)
+newval = memcache_decr(key::TEXT)
+memcache_delete(key::TEXT)
+
+
+-- column store
+shared_preload_libraries = 'cstore_fdw'
+CREATE EXTENSION cstore_fdw;
+
+CREATE SERVER cstore_server FOREIGN DATA WRAPPER cstore_fdw;
+CREATE FOREIGN TABLE table
+( ) SERVER cstore_server
+OPTIONS(compression 'pglz');
+
+INSERT INTO table SELECT * FROM sourcetable;
+
+
+-- timescale DB
+shared_preload_libraries = 'timescaledb'
+CREATE EXTENSION timescaledb;
+
+CREATE TABLE table (time TIMESTAMPTZ, value TEXT);
+SELECT create_hypertable(‘table', 'time');

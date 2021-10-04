@@ -1,0 +1,17 @@
+version: '3.1'
+
+volumes:
+  pg_project:
+
+services:
+  pg_db:
+    image: postgres:13
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=stage
+    volumes:
+      - pg_project:/var/lib/postgresql/data
+    ports:
+      - ${POSTGRES_PORT:-5432}:5432

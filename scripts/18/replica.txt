@@ -1,0 +1,141 @@
+#replica
+
+pg_lsclusters
+
+-- stop and delete 2 cluster
+sudo pg_ctlcluster 13 main2 stop
+sudo pg_dropcluster 13 main2
+
+-- create new 2 cluster
+sudo pg_createcluster -d /var/lib/postgresql/13/main2 13 main2
+
+
+pg_lsclusters
+
+-- delete files
+sudo rm -rf /var/lib/postgresql/13/main2
+
+-- Let's make a backup of our database. The -R switch will create a stub control file recovery.conf.
+sudo -u postgres pg_basebackup -p 5432 -R -D /var/lib/postgresql/13/main2
+
+-- Add hot spare parameter
+sudo su postgres
+echo 'hot_standby = on' >> /var/lib/postgresql/13/main2/postgresql.auto.conf
+exit
+
+sudo pg_ctlcluster 13 main2 start
+
+pg_lsclusters
+
+-- create a database on the master and see what happened on the replica
+sudo -u postgres psql
+CREATE DATABASE replica;
+exit;
+sudo -u postgres psql -p 5433
+\l replica
+
+
+-- Checking the status of replication
+SELECT * FROM pg_stat_replication \gx
+
+-- Let's look at the replica processes
+sudo su postgres
+ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/13/main2/postmaster.pid`
+ PID COMMAND
+  848 postgres: 10/main2: startup process   recovering 00000001000000000000000B
+  849 postgres: 10/main2: checkpointer process
+  850 postgres: 10/main2: writer process
+  851 postgres: 10/main2: stats collector process
+  852 postgres: 10/main2: wal receiver process   streaming 0/B002290
+
+
+-- Сравним с процессами мастера
+ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/13/main/postmaster.pid`
+  PID COMMAND
+  853 postgres: 10/main: wal sender process postgres [local] streaming 0/B002290
+10430 postgres: 10/main: checkpointer process
+10431 postgres: 10/main: writer process
+10432 postgres: 10/main: wal writer process
+10433 postgres: 10/main: autovacuum launcher process
+10434 postgres: 10/main: stats collector process
+10435 postgres: 10/main: bgworker: logical replication launcher
+
+ps -xf
+
+-- put the replica in the master state
+pg_ctlcluster 13 main2 promote
+
+
+
+-- Логическая репликация
+ALTER SYSTEM SET wal_level = logical;
+
+sudo pg_ctlcluster 13 main restart
+sudo -u postgres psql
+
+-- Change the password to the user postgres
+\password
+
+-- Create a publication on the first server
+\c replica
+CREATE TABLE test(i int);
+CREATE PUBLICATION test_pub FOR TABLE test;
+-- \password 
+\dRp+
+
+
+-- create a subscription on the second server
+sudo -u postgres psql -p 5433
+\c replica
+CREATE TABLE test(i int);
+
+CREATE SUBSCRIPTION test_sub 
+CONNECTION 'host=localhost port=5432 user=postgres password=Postgres123# dbname=replica' 
+PUBLICATION test_pub WITH (copy_data = false);
+
+\dRs
+
+-- Let's look at the status of the subscription
+SELECT * FROM pg_stat_subscription \gx
+
+-- add the same data
+-- on subscriber
+INSERT INTO test VALUES(1);
+
+-- on the publishing server
+INSERT INTO test VALUES(1);
+
+-- on subscriber
+SELECT * FROM test;
+
+-- clear the table and add an index
+TRUNCATE test;
+CREATE UNIQUE INDEX ON test (i);
+\dS+ test
+
+-- check the same data after creating the index
+-- on subscriber
+INSERT INTO test VALUES(2);
+
+-- on the publishing server
+INSERT INTO test VALUES(2);
+
+-- on subscriber
+SELECT * FROM test;
+
+-- Let's look at the status of the subscription
+SELECT * FROM pg_stat_subscription \gx
+
+-- we will also see the problem in the logs
+sudo tail /var/log/postgresql/postgresql-13-main2.log
+
+-- delete the conflicting entry on the subscriber
+DELETE FROM test WHERE i = 2;
+
+-- Let's look at the status of the subscription:
+SELECT * FROM pg_stat_subscription \gx
+
+-- to delete a post and a subscription
+DROP PUBLICATION test_pub;
+DROP SUBSCRIPTION test_sub;
+

@@ -1,0 +1,139 @@
+# backup
+sudo mkdir /home/1 && sudo chmod 777 /home/1
+
+sudo -u postgres psql
+
+CREATE DATABASE backup;
+\c backup
+CREATE TABLE test (i int, col text);
+INSERT INTO test VALUES (1, '123'), (2, '456'), (3, '789');
+
+-- logical copy
+COPY test TO '/home/1/test.csv' CSV HEADER;
+
+\! cat /home/1/test.csv
+
+-- restore to another table
+-- error!!!
+COPY test2 FROM '/home/1/test.csv' CSV HEADER;
+
+-- the table must be created in advance
+CREATE TABLE test2 (i int, col text);
+COPY test2 FROM '/home/1/test.csv' CSV HEADER;
+SELECT * FROM test2;
+
+-- use pg_dump
+exit -- from psql
+sudo -u postgres pg_dump -d backup --create
+sudo -u postgres pg_dump -d backup --create > /home/1/1.sql
+sudo -u postgres pg_dump -d backup --create | gzip > /home/1/backup.gz
+
+-- for pg_restore - custom options
+sudo -u postgres pg_dump -d backup -Fc > /home/1/custom.gz
+
+-- restore whole DB
+sudo -u postgres psql < /home/1/1.sql
+sudo -u postgres psql
+\c backup
+select * from test2;
+\dt
+exit
+echo "DROP DATABASE backup;" | sudo -u postgres psql
+sudo -u postgres psql < /home/1/1.sql
+
+-- pg_restore
+-- get duplicate data
+sudo -u postgres pg_restore /home/1/custom.gz -d backup
+sudo -u postgres psql
+\c backup
+select * from test2;
+
+echo "DROP DATABASE backup;" | sudo -u postgres psql
+sudo -u postgres pg_restore /home/1/custom.gz -d backup
+
+-- correct
+echo "CREATE DATABASE backup;" | sudo -u postgres psql
+sudo -u postgres pg_restore /home/1/custom.gz -d backup
+sudo -u postgres psql
+\c backup
+select * from test2;
+
+-- inly 1 table
+echo "DROP DATABASE backup;" | sudo -u postgres psql
+echo "CREATE DATABASE backup;" | sudo -u postgres psql
+sudo -u postgres pg_restore -t test /home/1/custom.gz -d backup
+sudo -u postgres psql
+\c backup
+\dt
+
+
+-- if we need decode to another charset
+pg_dump ... | iconv -f utf-8 -t cp-1251 > dump.sql
+
+-- pg_dump && pg_restore
+sudo -u postgres pg_dump --help
+sudo -u postgres pg_restore --help
+
+-- pg_dumpall
+sudo -u postgres pg_dumpall > /home/1/backupall.sql
+
+-- restore
+sudo -u postgres psql < /home/1/backupall.sql
+
+-- parallel workers
+sudo -u postgres pg_dumpall --clean --globals-only > /home/1/globals.sql
+sudo -u postgres pg_dumpall --clean --schema-only > /home/1/schema.sql
+sudo -u postgres pg_dump -d backup --create > /home/1/1.sql
+sudo -u postgres psql < /home/1/globals.sql
+sudo -u postgres psql < /home/1/schema.sql
+sudo -u postgres psql < /home/1/1.sql
+
+
+-- physical replication
+SELECT name, setting FROM pg_settings WHERE name IN ('wal_level','max_wal_senders');
+
+SELECT * FROM pg_replication_slots;
+
+-- change firewall options in pg_hba.conf
+SELECT type, database, user_name, address, auth_method 
+FROM pg_hba_file_rules() WHERE DATABASE = '{replication}';
+
+
+-- let`s create 2 cluster
+sudo -u postgres pg_createcluster -d /var/lib/postgresql/13/main2 13 main2
+
+-- delete files
+sudo -u postgres rm -rf /var/lib/postgresql/13/main2
+
+-- Let's make a backup of our database
+sudo -u postgres pg_basebackup -p 5432 -D /var/lib/postgresql/13/main2
+
+-- удалим ненужноe уже табличное пространство ts /home/postgres/tmptblspace
+sudo -u postgres psql
+\db
+DROP TABLESPACE ts;
+
+SELECT c.relname, t.spcname 
+FROM pg_class c 
+  JOIN pg_tablespace t ON c.reltablespace = t.oid 
+WHERE t.spcname = 'ts';
+
+\l+
+DROP DATABASE app;
+DROP TABLESPACE ts;
+
+sudo -u postgres pg_basebackup -p 5432 -D /var/lib/postgresql/13/main2
+
+sudo -u postgres pg_ctlcluster 13 main2 start
+
+pg_lsclusters
+
+sudo -u postgres psql --port 5433
+\l
+\c backup
+select * from test;
+
+SELECT name, setting FROM pg_settings WHERE name IN ('archive_mode','archive_command','archive_timeout');
+
+
+

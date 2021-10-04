@@ -1,0 +1,20 @@
+# big data
+1. https://proglib.io/p/big-data-razmer-imeet-znachenie-2019-10-19 
+2. https://hadoop.apache.org/
+3. https://cloud.google.com/bigquery
+4. https://cassandra.apache.org/
+5. https://clickhouse.tech/
+6. https://www.vertica.com/
+7. https://github.com/aeuge/Postgres13book/blob/main/scripts/11/bigdata.txt
+8. https://cloud.google.com/bigquery/docs/bq-command-line-tool
+9. https://www.postgresql.org/docs/13/postgres-fdw.html
+10. https://www.postgresql.org/docs/13/sql-copy.html
+11. https://github.com/dimitri/pgloader
+12. https://github.com/ossc-db/pg_bulkload
+13. https://github.com/GoogleCloudPlatform/gcsfuse
+14. https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/installing.md 
+15. https://pgtune.leopard.in.ua/#/
+16. https://github.com/citusdata/cstore_fdw
+17. https://asu-analitika.ru/chto-takoe-vitrina-dannyh-opredelenie-raznovidnosti-i-primery/
+18. https://www.hitachivantara.com/en-us/products/data-management-analytics.html
+19. https://en.wikipedia.org/wiki/Data_vault_modeling
