@@ -69,7 +69,7 @@ psql
 sudo nano /etc/postgresql/13/main/postgresql.conf
 
 -- host    all             all             0.0.0.0/0               md5
-sudo nano /etc/postgresql/13/main/pg_hba.conf:
+sudo nano /etc/postgresql/13/main/pg_hba.conf
 
 -- change password
 ALTER USER postgres PASSWORD 'Postgres123#';
