@@ -1,12 +1,16 @@
 -- physycal level
-gcloud compute ssh postgres13
+gcloud compute instances list
+
+gcloud compute ssh postgres14
 pg_lsclusters
 
 -- add another cluster
-sudo pg_createcluster 13 main2
-sudo nano /etc/postgresql/13/main/postgresql.conf
+pg_createcluster 14 main2
+sudo pg_createcluster 14 main2
+sudo nano /etc/postgresql/14/main/postgresql.conf
+
 sudo su postgres
-cd /var/lib/postgresql/13/main
+cd /var/lib/postgresql/14/main
 ls -la
 ls -l base
 # - command in psql
@@ -31,15 +35,26 @@ psql
 # \c app
 -- look for default tablespace
 # \l+ 
+
+exit
+cd tmptblspc/
+ls
+cd PG_14_202107181/
+ls -la
+
+cd 16385
+ls -la
+
+psql
 # CREATE TABLE test (i int);
 # CREATE TABLE test2 (i int) TABLESPACE pg_default;
-# SELECT TABLEname, tablespace FROM pg_TABLEs WHERE schemaname = 'public';
+# SELECT TABLEname, tablespace FROM pg_tables WHERE schemaname = 'public';
 -- change tablespace for TABLE
 # ALTER TABLE test SET TABLESPACE pg_default;
 # SELECT oid, spcname FROM pg_tablespace; -- oid унимальный номер, по кторому можем найти файлы
 # SELECT oid, datname,dattablespace FROM pg_database;
 
--- WHERE is TABLE
+-- where is table
 # SELECT pg_relation_filepath('test2');
 
 -- SHOW size of database
@@ -65,17 +80,22 @@ psql
 
 
 -- open access
+-- try access
+psql -h 34.134.57.202 -U postgres -W
+
+netstat -a | grep postgresql
+
 -- uncomment listen_addresses = '*'
-sudo nano /etc/postgresql/13/main/postgresql.conf
+sudo nano /etc/postgresql/14/main/postgresql.conf
 
 -- host    all             all             0.0.0.0/0               md5
-sudo nano /etc/postgresql/13/main/pg_hba.conf
+sudo nano /etc/postgresql/14/main/pg_hba.conf
 
 -- change password
 ALTER USER postgres PASSWORD 'Postgres123#';
 
 -- restart server
-sudo pg_ctlcluster 13 main restart
+sudo pg_ctlcluster 14 main restart
 
 -- try access
-psql -h 34.66.131.159 -U postgres -W
+psql -h 34.134.57.202 -U postgres -W
