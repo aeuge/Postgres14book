@@ -13,9 +13,9 @@ ALTER USER test LOGIN;
 -- error
 
 -- now peer authentication with unix socket, but in unix we have not user test
--- enable password by setting peer -> md5
-nano /etc/postgresql/13/main/pg_hba.conf
-pg_ctlcluster restart 13 main
+-- enable password by setting peer -> scram-sha-256
+nano /etc/postgresql/14/main/pg_hba.conf
+pg_ctlcluster restart 14 main
 
 -- set password
 \password test
