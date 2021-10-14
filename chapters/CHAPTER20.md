@@ -38,3 +38,4 @@
 bonus 
 https://habr.com/ru/post/518216/
 https://habr.com/ru/company/oleg-bunin/blog/489206/
+https://scalegrid.io/blog/postgresql-connection-pooling-part-4-pgbouncer-vs-pgpool/

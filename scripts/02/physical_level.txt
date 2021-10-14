@@ -46,9 +46,10 @@ cd 16385
 ls -la
 
 psql
+# \c app
 # CREATE TABLE test (i int);
 # CREATE TABLE test2 (i int) TABLESPACE pg_default;
-# SELECT TABLEname, tablespace FROM pg_tables WHERE schemaname = 'public';
+# SELECT tablename, tablespace FROM pg_tables WHERE schemaname = 'public';
 -- change tablespace for TABLE
 # ALTER TABLE test SET TABLESPACE pg_default;
 # SELECT oid, spcname FROM pg_tablespace; -- oid унимальный номер, по кторому можем найти файлы
@@ -78,6 +79,31 @@ psql
 -- size of tablespace
 # SELECT pg_size_pretty(pg_tablespace_size('ts'));
 
+-- try broke ts
+exit
+cd /home/postgres
+mkdir tmptblspc2
+psql
+# CREATE tablespace ts2 location '/home/postgres/tmptblspc2';
+
+# \c app
+# ALTER TABLE test SET TABLESPACE ts2;
+
+-- drop directory with new ts
+exit
+rm -rf tmptblspc2
+psql
+\c app
+\dt
+SELECT * FROM test;
+
+exit
+rm -rf tmptblspc
+psql
+\c app
+
+DROP DATABASE app;
+
 
 -- open access
 -- try access
@@ -99,3 +125,57 @@ sudo pg_ctlcluster 14 main restart
 
 -- try access
 psql -h 34.134.57.202 -U postgres -W
+
+
+-- pg_updatecluster
+sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-13
+
+pg_lsclusters
+
+pg_upgradecluster 13 main
+
+help pg_upgradecluster
+
+sudo pg_upgradecluster 13 main upgrade13
+
+sudo pg_renamecluster 13 main main13
+
+pg_lsclusters
+
+sudo -u postgres psql -p 5434
+
+CREATE ROLE testpass PASSWORD 'testpass' LOGIN;
+
+sudo -u postgres psql -p 5434 -U testpass -h localhost -d postgres -W
+
+sudo pg_upgradecluster 13 main13
+
+pg_lsclusters
+
+sudo pg_dropcluster 13 main13
+
+sudo cat /etc/postgresql/14/main13/pg_hba.conf
+
+sudo nano /etc/postgresql/14/main13/pg_hba.conf
+
+sudo pg_ctlcluster 14 main13 restart
+-- error
+sudo -u postgres psql -p 5434 -U testpass -h localhost -d postgres -W
+
+
+sudo -u postgres psql -p 5434
+ALTER USER testpass PASSWORD 'testpass';
+exit
+
+sudo -u postgres psql -p 5434 -U testpass -h localhost -d postgres -W
+
+-- change back to md5
+
+sudo nano /etc/postgresql/14/main13/pg_hba.conf
+
+sudo pg_ctlcluster 14 main13 restart
+sudo -u postgres psql -p 5434 -U testpass -h localhost -d postgres -W
+
+
+sudo pg_ctlcluster 14 main13 stop
+sudo pg_dropcluster 14 main13

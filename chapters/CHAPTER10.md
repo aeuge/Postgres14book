@@ -6,7 +6,8 @@
 5. https://pgtune.leopard.in.ua/#/
 6. https://www.postgresql.org/docs/13/parallel-query.html
 7. https://habr.com/ru/company/otus/blog/340870/ 
-8. https://habr.com/ru/company/tinkoff/blog/446342/ 
+8. https://habr.com/ru/company/tinkoff/blog/446342/
+9. https://www.percona.com/blog/why-linux-hugepages-are-super-important-for-database-servers-a-case-with-postgresql/ 
 
 https://github.com/jfcoz/postgresqltuner
 
