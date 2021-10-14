@@ -1,3 +1,4 @@
+-- locks
 
 SELECT * FROM pg_locks \gx
 SELECT pg_backend_pid();
@@ -20,20 +21,20 @@ ROLLBACK;
 -- advisory_lock
 -- 1 terminal
 BEGIN; 
-SELECT hashtext('заблокируй меня полностью');
-SELECT pg_advisory_lock(hashtext('заблокируй меня полностью'));
+SELECT hashtext('block me');
+SELECT pg_advisory_lock(hashtext('block me'));
 SELECT pg_backend_pid();
 
-SELECT locktype, relation::REGCLASS, virtualxid AS virtxid, transactionid AS xid, mode, granted FROM pg_locks WHERE pid = 1883;
+SELECT locktype, relation::REGCLASS, virtualxid AS virtxid, transactionid AS xid, mode, granted FROM pg_locks WHERE pid = 6413;
 
 -- 2 terminal
-SELECT pg_advisory_lock(hashtext('заблокируй меня полностью'));
+SELECT pg_advisory_lock(hashtext('block me'));
 
 -- 1 terminal
 COMMIT; 
 
 -- commit does not release the lock
-SELECT pg_advisory_unlock(hashtext('заблокируй меня полностью'));
+SELECT pg_advisory_unlock(hashtext('block me'));
 -- has it`s own PID
 
 

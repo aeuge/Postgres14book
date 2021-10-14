@@ -1,14 +1,17 @@
 #  config lecture
 SHOW config_file;
-sudo pg_ctlcluster 13 main stop
-sudo mv /var/lib/postgresql/13/main /var/lib/postgresql/13/maintest
+sudo pg_ctlcluster 14 main stop
+sudo mv /var/lib/postgresql/14/main /var/lib/postgresql/14/maintest
 
 -- errors
-sudo pg_ctlcluster 13 main start
-sudo pg_ctlcluster 13 main start -D /var/lib/postgresql/13/maintest
+sudo pg_ctlcluster 14 main start
+sudo pg_ctlcluster 14 main start -D /var/lib/postgresql/14/maintest
 
-sudo nano /etc/postgresql/13/main/postgresql.conf
+sudo nano /etc/postgresql/14/main/postgresql.conf
+sudo pg_ctlcluster 14 main start
 
+sudo -u postgres psql
+\l
 
 -- pg_settings
 SELECT count(*) FROM pg_settings;
@@ -31,7 +34,7 @@ SELECT current_setting('max_connections');
 -- pg_file_settings
 SELECT count(*) from pg_file_settings;
 SELECT sourcefile, count(*) FROM pg_file_settings GROUP BY sourcefile;
-SELECT * FROM pg_file_settings WHERE sourcefile='/var/lib/postgresql/13/maintest/postgresql.auto.conf';
+SELECT * FROM pg_file_settings WHERE sourcefile='/var/lib/postgresql/14/maintest/postgresql.auto.conf';
 
 
 -- tuning

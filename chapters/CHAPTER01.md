@@ -26,6 +26,7 @@
 25. https://en.wikipedia.org/wiki/Subnetwork
 26. https://en.wikipedia.org/wiki/Front_end_and_back_end
 27. https://en.wikipedia.org/wiki/Representational_state_transfer
-
+28. https://www.opennet.ru/opennews/art.shtml?num=55891
+29. https://www.postgresql.org/docs/14/datatype-json.html#JSONB-SUBSCRIPTING
 
 
