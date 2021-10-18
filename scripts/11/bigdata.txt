@@ -1,12 +1,12 @@
 -- creating 2 core 4 GB 100 ssd for big data
-gcloud beta compute --project=celtic-house-266612 instances create postgres13bd --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-minimal-2004-focal-v20210416 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres13bd --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+gcloud beta compute --project=celtic-house-266612 instances create postgres14bd --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-minimal-2004-focal-v20210928 --image-project=ubuntu-os-cloud --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres14bd --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
 
-gcloud compute ssh postgres13bd
+gcloud compute ssh postgres14bd
 
-sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt-get -y install postgresql
+sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-14
 
 bq show bigquery-public-data:chicago_taxi_trips.taxi_trips
-bq extract bigquery-public-data:chicago_taxi_trips.taxi_trips gs://pg13/taxi.csv.*
+bq extract bigquery-public-data:chicago_taxi_trips.taxi_trips gs://pg14/taxi.csv.*
 
 SELECT count(*)
 FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`;
@@ -20,13 +20,19 @@ order by 3 desc;
 https://github.com/GoogleCloudPlatform/gcsfuse
 
 -- installing
-https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/installing.md
+-- https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/installing.md
+export GCSFUSE_REPO=gcsfuse-`lsb_release -c -s`
+echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+sudo apt-get update
+sudo apt-get install gcsfuse
 
 -- mount under postgres
-sudo -u postgres
+sudo su postgres
 cd $HOME
 mkdir taxi
-gcsfuse pg13 taxi
+gcsfuse pg14 taxi
 
 -- umount 
 fusermount -u taxi
@@ -58,10 +64,13 @@ CREATE TABLE taxi_trips(unique_key text
 ,dropoff_longitude float
 ,dropoff_location text);
 
-cd /home/aeugene/taxi
+exit
+cd /var/lib/postgresql/taxi
 for f in *.csv*; do psql -d taxi -c "\\COPY taxi_trips FROM PROGRAM 'cat $f' CSV HEADER"; done
 
+psql
 \timing
+\c taxi
 SELECT count(*) FROM taxi_trips;
 
 EXPLAIN SELECT payment_type, round(sum(tips)/sum(tips+fare)*100) tips_persent, count(*)
@@ -73,3 +82,7 @@ SELECT payment_type, round(sum(tips)/sum(tips+fare)*100) tips_persent, count(*)
 FROM taxi_trips
 group by payment_type
 order by 3 desc;
+
+
+sudo nano /etc/postgresql/14/main/postgresql.conf
+sudo pg_ctlcluster 14 main restart
