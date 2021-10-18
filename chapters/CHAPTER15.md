@@ -8,7 +8,7 @@
 7. https://en.wikipedia.org/wiki/Ceph_(software)
 8. http://pgconfigurator.cybertec.at/
 9. https://pgtune.leopard.in.ua/
-10. https://www.postgresql.org/docs/13/geqo-pg-intro.html
+10. https://www.postgresql.org/docs/14/geqo-pg-intro.html
 11. https://tatiyants.com/pev
 12. https://explain.depesz.com/
 13. https://postgres.ai/docs/database-lab/what_is_database_lab

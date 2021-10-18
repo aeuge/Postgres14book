@@ -1,3 +1,4 @@
+-- joins
 
 CREATE DATABASE joins;
 \c joins
