@@ -31,6 +31,8 @@ sudo -u postgres pg_dump -d backup --create | gzip > /home/1/backup.gz
 -- for pg_restore - custom options
 sudo -u postgres pg_dump -d backup -Fc > /home/1/custom.gz
 
+ls -l /home/1/
+
 -- restore whole DB
 sudo -u postgres psql < /home/1/1.sql
 sudo -u postgres psql
@@ -47,6 +49,7 @@ sudo -u postgres pg_restore /home/1/custom.gz -d backup
 sudo -u postgres psql
 \c backup
 select * from test2;
+exit
 
 echo "DROP DATABASE backup;" | sudo -u postgres psql
 sudo -u postgres pg_restore /home/1/custom.gz -d backup
@@ -57,6 +60,7 @@ sudo -u postgres pg_restore /home/1/custom.gz -d backup
 sudo -u postgres psql
 \c backup
 select * from test2;
+exit
 
 -- inly 1 table
 echo "DROP DATABASE backup;" | sudo -u postgres psql
@@ -100,13 +104,13 @@ FROM pg_hba_file_rules() WHERE DATABASE = '{replication}';
 
 
 -- let`s create 2 cluster
-sudo -u postgres pg_createcluster -d /var/lib/postgresql/13/main2 13 main2
+sudo -u postgres pg_createcluster -d /var/lib/postgresql/14/main2 14 main2
 
 -- delete files
-sudo -u postgres rm -rf /var/lib/postgresql/13/main2
+sudo -u postgres rm -rf /var/lib/postgresql/14/main2
 
 -- Let's make a backup of our database
-sudo -u postgres pg_basebackup -p 5432 -D /var/lib/postgresql/13/main2
+sudo -u postgres pg_basebackup -p 5432 -D /var/lib/postgresql/14/main2
 
 -- удалим ненужноe уже табличное пространство ts /home/postgres/tmptblspace
 sudo -u postgres psql
@@ -122,9 +126,9 @@ WHERE t.spcname = 'ts';
 DROP DATABASE app;
 DROP TABLESPACE ts;
 
-sudo -u postgres pg_basebackup -p 5432 -D /var/lib/postgresql/13/main2
+sudo -u postgres pg_basebackup -p 5432 -D /var/lib/postgresql/14/main2
 
-sudo -u postgres pg_ctlcluster 13 main2 start
+sudo -u postgres pg_ctlcluster 14 main2 start
 
 pg_lsclusters
 

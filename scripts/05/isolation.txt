@@ -34,12 +34,7 @@ BEGIN;
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 -- WARNING:  there is already a transaction in progress
 SELECT * FROM testA;
- i | amount
----+--------
- 2 |    500
- 1 |    555
-(2 rows)
-
+ 
 -- 2 console
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 INSERT INTO testA VALUES (777);
@@ -47,13 +42,7 @@ COMMIT;
 
 -- 1 console
 SELECT * FROM testA;
- i | amount
----+--------
- 2 |    500
- 1 |    555
-(2 rows)
-
-
+ 
 
 -- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 DROP TABLE IF EXISTS testS;

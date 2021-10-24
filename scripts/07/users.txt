@@ -14,10 +14,12 @@ ALTER USER test LOGIN;
 
 -- now peer authentication with unix socket, but in unix we have not user test
 -- enable password by setting peer -> scram-sha-256
+exit
 nano /etc/postgresql/14/main/pg_hba.conf
 pg_ctlcluster restart 14 main
 
 -- set password
+sudo -u postgres psql
 \password test
 or
 ALTER USER test PASSWORD 'pass$123';
@@ -29,6 +31,11 @@ SELECT * FROM t;
 -- create new user with NOLOGIN
 CREATE USER test2 WITH PASSWORD 'pass$123' NOLOGIN;
 \c - test2
+
+\c - postgres
+GRANT SELECT ON t TO test;
+\c - test
+SELECT * FROM t;
 
 --
 CREATE DATABASE testdb;

@@ -46,6 +46,20 @@ WHERE seq_scan > 0
 ORDER BY seq_tup_read DESC
 LIMIT 25;
 
+-- pgtop
+sudo apt update
+sudo DEBIAN_FRONTEND=noninteractive apt install pgtop -y -q
+sudo su postgres
+pg_top
+
+-- second terminal
+sudo -u postgres psql
+CREATE TABLE test(i int);
+INSERT INTO test SELECT s.id FROM generate_series(1,1000000000) AS s(id);
+
+-- first terminal
+-- Q/E/L and PID process
+
 
 -- memcache
 shared_preload_libraries = 'pgmemcache'

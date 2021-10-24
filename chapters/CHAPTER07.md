@@ -6,3 +6,6 @@
 5. https://en.wikipedia.org/wiki/MD5
 6. https://www.postgresql.org/docs/14/sql-grant.html
 7. https://www.postgresql.org/docs/14/sql-revoke.html
+
+bonus
+https://www.interdb.jp/pg/pgsql08.html

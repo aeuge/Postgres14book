@@ -6,10 +6,16 @@
 5. https://okmeter.io/
 6. https://en.wikipedia.org/wiki/Network-attached_storage 
 7. https://en.wikipedia.org/wiki/Ceph_(software)
-8. http://pgconfigurator.cybertec.at/
-9. https://pgtune.leopard.in.ua/
-10. https://www.postgresql.org/docs/14/geqo-pg-intro.html
-11. https://tatiyants.com/pev
-12. https://explain.depesz.com/
-13. https://postgres.ai/docs/database-lab/what_is_database_lab
-14. https://github.com/ohmu/pgmemcache
+8. https://pg_top.gitlab.io/
+9. http://pgconfigurator.cybertec.at/
+9. https://pg_proctab.gitlab.io/
+10. https://pgtune.leopard.in.ua/
+11. https://www.postgresql.org/docs/14/geqo-pg-intro.html
+12. https://tatiyants.com/pev
+13. https://explain.depesz.com/
+14. https://gitlab.com/postgres-ai/joe
+15. https://postgres.ai/docs/database-lab/what_is_database_lab
+16. https://github.com/ohmu/pgmemcache
+17. https://github.com/citusdata/cstore_fdw 
+18. https://github.com/timescale/timescaledb
+

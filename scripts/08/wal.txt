@@ -39,8 +39,8 @@ SELECT bufferid,
        isdirty,
        usagecount
 FROM   pg_buffercache b
-WHERE  b.relDATABASE IN (    0, (SELECT oid FROM pg_DATABASE WHERE datname = current_database()) )
-AND    b.usagecount is not null;
+WHERE  b.reldatabase IN (    0, (SELECT oid FROM pg_database WHERE datname = current_database()) )
+AND    b.usagecount IS NOT NULL;
 
 SELECT * FROM test limit 10;
 SELECT * FROM pg_buffercache_v WHERE relname='test';
