@@ -165,7 +165,7 @@ kubectl apply -f postgres-configmap.yaml -f postgres-storage.yaml -f postgres-de
 
 kubectl get all
 
-kubectl exec -it pod/postgres-86d8848dd8-fdf7q bash
+kubectl exec -it pod/postgres-6c7f9fc89c-hz6nt bash
 df
 -- /dev/sdb 5гб
 psql -U postgresadmin -d postgres
@@ -178,7 +178,8 @@ kubectl port-forward service/postgres 5432:5432
 -- for access from outside use LoadBalancer. NodePort only for inside GCP
 cat postgres-service2.yaml
 kubectl apply -f postgres-service2.yaml
-psql -h 35.222.104.155 -U postgresadmin -W -d postgresdb
+kubectl get svc
+psql -h 35.202.44.63 -U postgresadmin -W -d postgresdb
 \l
 
 kubectl delete all --all && kubectl delete pvc --all && kubectl delete cm --all && kubectl delete secrets --all
