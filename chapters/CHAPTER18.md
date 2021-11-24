@@ -1,9 +1,10 @@
 # replica
 1. https://www.postgresql.org/docs/13/high-availability.html
-2. https://www.postgresql.org/docs/13/app-pgrewind.html
-3. https://www.postgresql.org/docs/13/runtime-config-replication.html
-4. https://www.postgresql.org/docs/13/logical-replication.html
-5. https://bucardo.org/Bucardo/
-6. https://www.postgrespro.ru/products/postgrespro/enterprise
-7. https://www.2ndquadrant.com/en/resources/postgres-bdr-2ndquadrant/
-8. https://habr.com/ru/post/269889/
+2. https://en.wikipedia.org/wiki/Tee_(command)
+3. https://www.postgresql.org/docs/13/app-pgrewind.html
+4. https://www.postgresql.org/docs/13/runtime-config-replication.html
+5. https://www.postgresql.org/docs/13/logical-replication.html
+6. https://bucardo.org/Bucardo/
+7. https://www.postgrespro.ru/products/postgrespro/enterprise
+8. https://www.2ndquadrant.com/en/resources/postgres-bdr-2ndquadrant/
+9. https://habr.com/ru/post/269889/

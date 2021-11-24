@@ -17,6 +17,7 @@
 16. https://github.com/wal-e/wal-e
 17. https://github.com/wal-g/wal-g
 18. https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/
+19. https://www.postgresql.org/docs/14/app-pgverifybackup.html
 
 
 

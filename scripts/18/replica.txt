@@ -2,28 +2,31 @@
 
 pg_lsclusters
 
--- stop and delete 2 cluster
-sudo pg_ctlcluster 13 main2 stop
-sudo pg_dropcluster 13 main2
+-- stop and delete 2 clusters
+sudo pg_ctlcluster 14 main stop
+sudo pg_dropcluster 14 main
+sudo pg_ctlcluster 14 main2 stop
+sudo pg_dropcluster 14 main2
 
--- create new 2 cluster
-sudo pg_createcluster -d /var/lib/postgresql/13/main2 13 main2
+-- create new 2 clusters
+sudo pg_createcluster -d /var/lib/postgresql/14/main 14 main
+sudo pg_createcluster -d /var/lib/postgresql/14/main2 14 main2
 
 
 pg_lsclusters
 
--- delete files
-sudo rm -rf /var/lib/postgresql/13/main2
+sudo pg_ctlcluster 14 main start
+
+-- delete files from 2
+sudo rm -rf /var/lib/postgresql/14/main2
 
 -- Let's make a backup of our database. The -R switch will create a stub control file recovery.conf.
-sudo -u postgres pg_basebackup -p 5432 -R -D /var/lib/postgresql/13/main2
+sudo -u postgres pg_basebackup -p 5432 -R -D /var/lib/postgresql/14/main2
 
 -- Add hot spare parameter
-sudo su postgres
-echo 'hot_standby = on' >> /var/lib/postgresql/13/main2/postgresql.auto.conf
-exit
+echo 'hot_standby = on' >> sudo tee /var/lib/postgresql/14/main2/postgresql.auto.conf
 
-sudo pg_ctlcluster 13 main2 start
+sudo pg_ctlcluster 14 main2 start
 
 pg_lsclusters
 
@@ -40,7 +43,7 @@ SELECT * FROM pg_stat_replication \gx
 
 -- Let's look at the replica processes
 sudo su postgres
-ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/13/main2/postmaster.pid`
+ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/14/main2/postmaster.pid`
  PID COMMAND
   848 postgres: 10/main2: startup process   recovering 00000001000000000000000B
   849 postgres: 10/main2: checkpointer process
@@ -50,7 +53,7 @@ ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/13/main2/postmaster.pid`
 
 
 -- Сравним с процессами мастера
-ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/13/main/postmaster.pid`
+ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/14/main/postmaster.pid`
   PID COMMAND
   853 postgres: 10/main: wal sender process postgres [local] streaming 0/B002290
 10430 postgres: 10/main: checkpointer process
@@ -63,14 +66,14 @@ ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/13/main/postmaster.pid`
 ps -xf
 
 -- put the replica in the master state
-pg_ctlcluster 13 main2 promote
+pg_ctlcluster 14 main2 promote
 
 
 
 -- Логическая репликация
 ALTER SYSTEM SET wal_level = logical;
 
-sudo pg_ctlcluster 13 main restart
+sudo pg_ctlcluster 14 main restart
 sudo -u postgres psql
 
 -- Change the password to the user postgres
@@ -127,7 +130,7 @@ SELECT * FROM test;
 SELECT * FROM pg_stat_subscription \gx
 
 -- we will also see the problem in the logs
-sudo tail /var/log/postgresql/postgresql-13-main2.log
+sudo tail /var/log/postgresql/postgresql-14-main2.log
 
 -- delete the conflicting entry on the subscriber
 DELETE FROM test WHERE i = 2;
