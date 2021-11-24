@@ -31,42 +31,173 @@ sudo pg_ctlcluster 14 main2 start
 pg_lsclusters
 
 -- create a database on the master and see what happened on the replica
-sudo -u postgres psql
-CREATE DATABASE replica;
-exit;
-sudo -u postgres psql -p 5433
-\l replica
+sudo -u postgres psql -c 'CREATE DATABASE replica;'
+
+sudo -u postgres psql -p 5433 -c '\l replica';
 
 
 -- Checking the status of replication
-SELECT * FROM pg_stat_replication \gx
+sudo su postgres 
+psql 
+SELECT * FROM pg_stat_replication\gx
 
 -- Let's look at the replica processes
-sudo su postgres
+exit
 ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/14/main2/postmaster.pid`
- PID COMMAND
-  848 postgres: 10/main2: startup process   recovering 00000001000000000000000B
-  849 postgres: 10/main2: checkpointer process
-  850 postgres: 10/main2: writer process
-  851 postgres: 10/main2: stats collector process
-  852 postgres: 10/main2: wal receiver process   streaming 0/B002290
-
-
--- Сравним с процессами мастера
+ 
+-- master process
 ps -o pid,command --ppid `head -n 1 /var/lib/postgresql/14/main/postmaster.pid`
-  PID COMMAND
-  853 postgres: 10/main: wal sender process postgres [local] streaming 0/B002290
-10430 postgres: 10/main: checkpointer process
-10431 postgres: 10/main: writer process
-10432 postgres: 10/main: wal writer process
-10433 postgres: 10/main: autovacuum launcher process
-10434 postgres: 10/main: stats collector process
-10435 postgres: 10/main: bgworker: logical replication launcher
-
-ps -xf
 
 -- put the replica in the master state
 pg_ctlcluster 14 main2 promote
+
+
+
+-- pg_rewind --
+gcloud beta compute --project=celtic-house-266612 instances create postgres2 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=ubuntu-2104-hirsute-v20211119 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres2 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+gcloud compute ssh postgres2
+sudo apt update && sudo apt-mark hold linux-image-5.11.0-1022-gcp && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-14
+
+pg_lsclusters
+
+-- on 1 && 2 server
+sudo pg_ctlcluster 14 main stop
+sudo mkdir /archive
+sudo chown -R postgres:postgres /archive
+sudo su postgres
+ip a
+echo "listen_addresses = '10.128.15.209'" >> /etc/postgresql/14/main/postgresql.conf
+echo "wal_log_hints = on" >> /etc/postgresql/14/main/postgresql.conf
+
+echo "archive_mode = on" >>  /etc/postgresql/14/main/postgresql.conf
+echo "archive_command = 'test ! -f /archive/%f && cp %p /archive/%f'" >>  /etc/postgresql/14/main/postgresql.conf
+
+echo "host replication replica 10.128.15.0/24 md5" >> /etc/postgresql/14/main/pg_hba.conf
+echo "host all rewind 10.128.15.0/24 md5" >> /etc/postgresql/14/main/pg_hba.conf
+
+
+-- 1 server
+cd $HOME
+pg_ctlcluster 14 main start
+
+-- create replica and rewind users with password test123
+
+psql -c "CREATE USER replica WITH REPLICATION encrypted password 'test123'"
+psql -c "CREATE USER rewind SUPERUSER encrypted PASSWORD 'test123'"
+
+-- create sample database and fill it 
+
+psql -c "create database sample"
+pgbench -i -s 10 sample
+
+-- on 2 server
+-- cleanup data directory
+rm -rf /var/lib/postgresql/14/main
+
+-- MANUAL restore cluster from master (it will ask for test123 password of replica user)
+pg_basebackup --host=10.128.15.209 --port=5432 --username=replica --pgdata=/var/lib/postgresql/14/main/ --progress --write-recovery-conf --create-slot --slot=replica2
+
+-- notes:
+--  it will ask for 123 password of replica user created earlier
+--  it might take some time to backup restore 500mb of data
+--  if it wait for a checkpoint before starting, so run on a master
+psql -c "checkpoint" 
+
+-- make sure that connection info is saved
+cat /var/lib/postgresql/14/main/postgresql.auto.conf
+
+-- and that you have standby.signal file in place (existence of this file will force postgres to run as slave)
+ls -la /var/lib/postgresql/14/main/ | grep standby
+
+-- start postgres
+pg_ctlcluster 14 main start
+
+-- and make sure it is up and running - see online,recovery
+pg_lsclusters
+
+-- on 1 server
+psql -c "select * from pg_stat_replication"
+psql -c "select * from pg_replication_slots"
+
+-- lets create table and fill it with some dummy data
+
+-- psql sample -c "drop table messages"
+psql sample -c "create table messages(m text)"
+psql sample -c "insert into messages values('hello')"
+psql sample -c "select * from messages"
+
+-- almost immediatelly you should see that table and message on a replica
+-- Failover
+-- on a second container
+-- lets pretend that we lose our master - promote second container as a new master
+
+pg_ctlcluster 14 main promote
+
+-- standby file should be removed automatically
+ls -la /var/lib/postgresql/14/main/ | grep standby
+
+-- Connection info in postgres.auto.conf will left inact, but it is ok, until there is no standby file
+cat /var/lib/postgresql/14/main/postgresql.auto.conf
+
+pg_lsclusters
+
+-- write records now to 2 server
+psql sample -c "insert into messages values('world')"
+psql sample -c "select * from messages"
+
+-- on 1
+
+psql sample -c "insert into messages values('russia')"
+psql sample -c "select * from messages"
+
+-- has splitbrain
+
+-- 1 stop postgres 
+pg_ctlcluster 14 main stop
+
+-- rewind
+/usr/lib/postgresql/14/bin/pg_rewind --target-pgdata /var/lib/postgresql/14/main --source-server="postgresql://rewind:test123@postres2:5432/sample" --progress
+
+ping postgres2
+
+/usr/lib/postgresql/14/bin/pg_rewind --target-pgdata /var/lib/postgresql/14/main --source-server="postgresql://rewind:test123@10.128.15.210:5432/sample" --progress
+
+-- if error
+rewind might complain with error like: pg_rewind: error: could not open file "/var/lib/postgresql/12/main/pg_wal/00000001000000000000000A": No such file or directory you gonna need to copy this file from /archive to pg_wal, e.g.:
+
+ls -la /archive/
+cp /archive/00000001000000000000000A /var/lib/postgresql/14/main/pg_wal/
+-- chown postgres:postgres /var/lib/postgresql/14/main/pg_wal/00000001000000000000000A
+
+/usr/lib/postgresql/14/bin/pg_rewind --target-pgdata /var/lib/postgresql/14/main --source-server="postgresql://rewind:test123@10.128.15.210:5432/sample" --progress
+-- now, when we rewinded lets make it slave
+
+
+-- create standy signal
+touch /var/lib/postgresql/14/main/standby.signal
+
+-- and add replication info
+echo "primary_conninfo = 'user=replica password=test123 host=10.128.15.210 port=5432 sslmode=prefer sslcompression=0 gssencmode=prefer krbsrvname=postgres target_session_attrs=any'" >> /var/lib/postgresql/14/main/postgresql.auto.conf
+-- adding another relication slot
+echo "primary_slot_name = 'replica2'" >> /var/lib/postgresql/14/main/postgresql.auto.conf
+
+-- create slot on new master
+
+psql -c "select * from pg_create_physical_replication_slot('replica2')"
+psql -c "select * from pg_replication_slots"
+
+-- start postgres
+pg_ctlcluster 14 main start
+
+pg_lsclusters
+
+-- check that data is synced
+psql sample -c "select * from messages"
+
+
+pg_ctlcluster 14 main promote
+gcloud compute instances delete postgres2
+
 
 
 
