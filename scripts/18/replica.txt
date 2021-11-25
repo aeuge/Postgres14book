@@ -202,72 +202,83 @@ gcloud compute instances delete postgres2
 
 
 -- Логическая репликация
-ALTER SYSTEM SET wal_level = logical;
+sudo -u postgres psql -c 'ALTER SYSTEM SET wal_level = logical;'
 
 sudo pg_ctlcluster 14 main restart
-sudo -u postgres psql
 
 -- Change the password to the user postgres
-\password
+sudo -u postgres psql -c "ALTER USER postgres WITH password 'Postgres123#';"
 
 -- Create a publication on the first server
-\c replica
-CREATE TABLE test(i int);
-CREATE PUBLICATION test_pub FOR TABLE test;
--- \password 
-\dRp+
+sudo -u postgres psql -c "CREATE DATABASE replica;";
+sudo -u postgres psql replica -c "CREATE TABLE test(i int);"
+sudo -u postgres psql replica -c "CREATE PUBLICATION test_pub FOR TABLE test;"
+sudo -u postgres psql replica -c "\dRp+"
 
 
 -- create a subscription on the second server
-sudo -u postgres psql -p 5433
-\c replica
-CREATE TABLE test(i int);
+sudo -u postgres psql replica -p 5433 -c 'CREATE TABLE test(i int);'
 
-CREATE SUBSCRIPTION test_sub 
+sudo -u postgres psql replica -p 5433 -c "CREATE SUBSCRIPTION test_sub 
 CONNECTION 'host=localhost port=5432 user=postgres password=Postgres123# dbname=replica' 
-PUBLICATION test_pub WITH (copy_data = false);
+PUBLICATION test_pub WITH (copy_data = false);"
 
-\dRs
+-- on 1
+sudo -u postgres psql -c "show listen_addresses;"
+
+sudo -u postgres psql -c "ALTER SYSTEM SET listen_addresses = '10.128.15.209, 127.0.0.1';"
+sudo -u postgres psql -c "SELECT pg_reload_conf();"
+
+sudo pg_ctlcluster 14 main restart
+
+sudo -u postgres psql -c "show listen_addresses;"
+
+-- on 2
+sudo -u postgres psql replica -p 5433 -c "CREATE SUBSCRIPTION test_sub 
+CONNECTION 'host=localhost port=5432 user=postgres password=Postgres123# dbname=replica' 
+PUBLICATION test_pub WITH (copy_data = false);"
+
+sudo -u postgres psql replica -p 5433 -c "\dRs";
 
 -- Let's look at the status of the subscription
-SELECT * FROM pg_stat_subscription \gx
+sudo -u postgres psql replica -p 5433 -c "SELECT * FROM pg_stat_subscription";
 
 -- add the same data
 -- on subscriber
-INSERT INTO test VALUES(1);
+sudo -u postgres psql replica -p 5433 -c "INSERT INTO test VALUES(1);"
 
 -- on the publishing server
-INSERT INTO test VALUES(1);
+sudo -u postgres psql replica -c "INSERT INTO test VALUES(1);"
 
 -- on subscriber
-SELECT * FROM test;
+sudo -u postgres psql replica -p 5433 -c "SELECT * FROM test;"
 
--- clear the table and add an index
-TRUNCATE test;
-CREATE UNIQUE INDEX ON test (i);
-\dS+ test
+-- clear the table and add an index on subscriber
+sudo -u postgres psql replica -p 5433 -c "TRUNCATE test;"
+sudo -u postgres psql replica -p 5433 -c "CREATE UNIQUE INDEX ON test (i);"
+sudo -u postgres psql replica -p 5433 -c "\dS+ test"
 
 -- check the same data after creating the index
 -- on subscriber
-INSERT INTO test VALUES(2);
+sudo -u postgres psql replica -p 5433 -c "INSERT INTO test VALUES(2);"
 
 -- on the publishing server
-INSERT INTO test VALUES(2);
+sudo -u postgres psql replica -c "INSERT INTO test VALUES(2);"
 
 -- on subscriber
-SELECT * FROM test;
+sudo -u postgres psql replica -p 5433 -c "SELECT * FROM test;"
 
 -- Let's look at the status of the subscription
-SELECT * FROM pg_stat_subscription \gx
+sudo -u postgres psql replica -p 5433 -c "SELECT * FROM pg_stat_subscription;"
 
 -- we will also see the problem in the logs
 sudo tail /var/log/postgresql/postgresql-14-main2.log
 
 -- delete the conflicting entry on the subscriber
-DELETE FROM test WHERE i = 2;
+sudo -u postgres psql replica -p 5433 -c "DELETE FROM test WHERE i = 2;"
 
 -- Let's look at the status of the subscription:
-SELECT * FROM pg_stat_subscription \gx
+sudo -u postgres psql replica -p 5433 -c "SELECT * FROM pg_stat_subscription;"
 
 -- to delete a post and a subscription
 DROP PUBLICATION test_pub;

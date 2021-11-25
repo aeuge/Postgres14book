@@ -90,3 +90,15 @@ CREATE INDEX idx_address_gin ON address USING GIN (to_tsvector('english', addres
 SELECT count(*)
 FROM address
 WHERE to_tsvector('english', address) @@ to_tsquery('english','Street')
+
+
+-- reindex
+psql -c "create database index_test"
+pgbench -i -s 10 index_test
+
+psql
+\dt
+CREATE EXTENSION pgstattuple;
+SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
+\d+ pgbench_accounts
+
