@@ -96,9 +96,10 @@ WHERE to_tsvector('english', address) @@ to_tsquery('english','Street')
 psql -c "create database index_test"
 pgbench -i -s 10 index_test
 
-psql
+psql 
+\с index_test
 \dt
 CREATE EXTENSION pgstattuple;
-SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
 \d+ pgbench_accounts
+SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
 

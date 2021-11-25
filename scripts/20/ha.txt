@@ -1,12 +1,12 @@
 -- HA clusters
 -- PostgresHA GKE 
 
-gcloud beta container --project "celtic-house-266612" clusters create "postgresha" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.19.9-gke.1900" --release-channel "None" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "30" --metadata disable-legacy-endpoints=true --max-pods-per-node "110" --preemptible --num-nodes "3" --enable-stackdriver-kubernetes --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
-
-NAME        LOCATION       MASTER_VERSION   MASTER_IP      MACHINE_TYPE  NODE_VERSION     NUM_NODES  STATUS
-postgresha  us-central1-c  1.19.9-gke.1900  35.194.59.184  e2-medium     1.19.9-gke.1900  3          RUNNING
+-- --cluster-version "1.21.5-gke.1302" (21/11/18)
+-- need to update in time
+gcloud beta container --project "celtic-house-266612" clusters create "postgresha" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.21.5-gke.1302" --release-channel "regular" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-standard" --disk-size "30" --metadata disable-legacy-endpoints=true --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" --max-pods-per-node "110" --preemptible --num-nodes "3" --logging=SYSTEM,WORKLOAD --monitoring=SYSTEM --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
 
 gcloud container clusters list
+
 kubectl get nodes
 -- https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl
 -- gcloud container clusters get-credentials postgresha --zone us-central1-c
@@ -40,12 +40,12 @@ export POSTGRES_PASSWORD=$(kubectl get secret --namespace default pgsql-ha-postg
 echo $POSTGRES_PASSWORD
 kubectl port-forward --namespace default svc/pgsql-ha-postgresql-ha-pgpool 5432:5432
 
-PGPASSWORD=W8gBnN9UEb psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+PGPASSWORD=46BefFz7Ja psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
 
-kubectl exec -it pod/pgsql-ha-postgresql-ha-pgpool-56458bdc5d-82kkw -- bash
+kubectl exec -it pod/pgsql-ha-postgresql-ha-pgpool-8cf98f5d4-5hgdq -- bash
 cat /opt/bitnami/pgpool/conf/pgpool.conf
 -- http://support.ptc.com/help/thingworx_hc/thingworx_8_hc/ru/index.html#page/ThingWorx/Help/ThingWorxHighAvailability/InstallingandConfiguringPostgreSQLHA.html
-
+exit
 
 -- add load balancer
 export POSTGRES_PASSWORD=$(kubectl get secret --namespace default pgsql-ha-postgresql-ha-postgresql -o jsonpath="{.data.postgresql-password}" | base64 --decode)
@@ -56,7 +56,7 @@ helm upgrade pgsql-ha bitnami/postgresql-ha --set service.type=LoadBalancer --se
 
 export SERVICE_IP=$(kubectl get svc --namespace default pgsql-ha-postgresql-ha-pgpool --template "{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}")
 echo $SERVICE_IP
-PGPASSWORD=W8gBnN9UEb psql -h $SERVICE_IP -p 5432 -U postgres -d postgres
+PGPASSWORD=46BefFz7Ja psql -h $SERVICE_IP -p 5432 -U postgres -d postgres
 
 -- 2 case
 PGPASSWORD=$POSTGRES_PASSWORD psql -h $SERVICE_IP -p 5432 -U postgres -d postgres
@@ -67,12 +67,9 @@ gcloud compute disks list
 
 
 -- Patroni
-Postgres operator GKE
+-- Postgres operator GKE
 
-gcloud beta container --project "celtic-house-266612" clusters create "postgresoperator" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.19.9-gke.1900" --release-channel "None" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "30" --metadata disable-legacy-endpoints=true --max-pods-per-node "110" --preemptible --num-nodes "3" --enable-stackdriver-kubernetes --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
-
-NAME              LOCATION       MASTER_VERSION   MASTER_IP       MACHINE_TYPE  NODE_VERSION     NUM_NODES  STATUS
-postgresoperator  us-central1-c  1.19.9-gke.1900  34.136.139.222  e2-medium     1.19.9-gke.1900  3          RUNNING
+gcloud beta container --project "celtic-house-266612" clusters create "postgresoperator" --zone "us-central1-c" --no-enable-basic-auth --cluster-version "1.21.5-gke.1302" --release-channel "regular" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-standard" --disk-size "30" --metadata disable-legacy-endpoints=true --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" --max-pods-per-node "110" --preemptible --num-nodes "3" --logging=SYSTEM,WORKLOAD --monitoring=SYSTEM --enable-ip-alias --network "projects/celtic-house-266612/global/networks/default" --subnetwork "projects/celtic-house-266612/regions/us-central1/subnetworks/default" --no-enable-intra-node-visibility --default-max-pods-per-node "110" --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --enable-shielded-nodes --node-locations "us-central1-c"
 
 -- postgres operator
 kubectl api-resources
@@ -97,7 +94,7 @@ kubectl port-forward svc/postgres-operator-ui 8081:80
 -- make cluster from UI
 name - minimal
 instances - 2
-галочка на pg_bouncer
+check on pg_bouncer
 
 -- 
 kubectl get all
