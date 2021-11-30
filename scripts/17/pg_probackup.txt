@@ -1,0 +1,204 @@
+# pg_probackup
+gcloud beta compute --project=celtic-house-266612 instances create probackup --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=ubuntu-2104-hirsute-v20211022 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute ssh probackup
+
+sudo apt update && sudo apt-mark hold linux-image-5.11.0-1023-gcp && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-14
+
+-- install pg_probackup
+sudo sh -c 'echo "deb [arch=amd64] https://repo.postgrespro.ru/pg_probackup/deb/ $(lsb_release -cs) main-$(lsb_release -cs)" > /etc/apt/sources.list.d/pg_probackup.list' && sudo wget -O - https://repo.postgrespro.ru/pg_probackup/keys/GPG-KEY-PG_PROBACKUP | sudo apt-key add - && sudo apt-get update
+cd /etc/apt/sources.list.d
+sudo nano pg_probackup.list
+hirsute -> focal
+main-hirsute -> focal
+
+sudo apt update && sudo apt-mark hold linux-image-5.11.0-1023-gcp && sudo DEBIAN_FRONTEND=noninteractive apt install pg-probackup-14 pg-probackup-14-dbg postgresql-contrib postgresql-14-pg-checksums -y
+
+-- create backup dir & BACKUP_PATH
+
+sudo mkdir /home/backups && sudo chown postgres:postgres /home/backups
+sudo su postgres
+
+echo "BACKUP_PATH=/home/backups/">>~/.bashrc
+echo "export BACKUP_PATH">>~/.bashrc
+
+cd $HOME
+. .bashrc
+
+echo $BACKUP_PATH
+
+-- create ROLE PostgreSQL for backups & give it rights to execute backup
+psql
+create user backup;
+ALTER ROLE backup NOSUPERUSER;
+ALTER ROLE backup WITH REPLICATION;
+GRANT USAGE ON SCHEMA pg_catalog TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.current_setting(text) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_is_in_recovery() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_start_backup(text, boolean, boolean) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_stop_backup(boolean, boolean) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_create_restore_point(text) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_last_wal_replay_lsn() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.txid_current() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.txid_current_snapshot() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.txid_snapshot_xmax(txid_snapshot) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_control_checkpoint() TO backup;
+exit
+
+-- init probackup
+pg_probackup-14 init
+
+-- look at backup dir
+ls -l $BACKUP_PATH
+
+-- init main instance
+pg_probackup-14 add-instance --instance 'main' -D /var/lib/postgresql/14/main
+
+-- look at config
+pg_probackup-14 show-config --instance main
+
+-- create database & table for tests
+psql -c "CREATE DATABASE testb;"
+psql testb -c "create table test(i int);"
+psql testb -c "insert into test values (10), (20), (30);"
+psql testb -c "select * from test;"
+
+-- create FULL backup
+pg_probackup-14 backup --instance 'main' -b FULL --stream --temp-slot
+
+-- has two warnings
+-- 1 - need to enable checksums
+pg_ctlcluster 14 main stop
+
+-- pg_checksums 14 main
+-- sudo apt-mark hold linux-image-5.11.0-1022-gcp && sudo DEBIAN_FRONTEND=noninteractive apt install postgresql-14-pg-checksums -y
+
+/usr/lib/postgresql/14/bin/pg_checksums -D /var/lib/postgresql/14/main --enable
+
+pg_ctlcluster 14 main start
+pg_lsclusters
+
+-- 2 do not perform backups with ROOT user. Earlier we create USER backup
+-- create password backup
+psql -c "ALTER USER backup PASSWORD 'test123';"
+
+pg_probackup-14 show
+
+-- adding additional data
+psql testb -c "insert into test values (4);"
+
+
+-- create INCREMENTAL backup with user backup
+pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup -W
+
+pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup --pgdatabase=testb
+
+
+-- need to create rights to execute backup functions in EACH database
+psql -d testb
+GRANT USAGE ON SCHEMA pg_catalog TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.current_setting(text) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_is_in_recovery() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_start_backup(text, boolean, boolean) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_stop_backup(boolean, boolean) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_create_restore_point(text) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_last_wal_replay_lsn() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.txid_current() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.txid_current_snapshot() TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.txid_snapshot_xmax(txid_snapshot) TO backup;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_control_checkpoint() TO backup;
+exit
+
+
+pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup --pgdatabase=testb
+pg_probackup-14 show
+
+-- test restore
+-- create new cluster
+
+pg_createcluster 14 main2
+rm -rf /var/lib/postgresql/14/main2
+
+pg_probackup-14 restore --instance 'main' -i 'R3DLZM' -D /var/lib/postgresql/14/main2 
+
+pg_ctlcluster 14 main2 start
+
+
+-- check restored data
+
+psql testb -p 5433 -c 'select * from test;'
+
+
+-- differentioal backups
+-- PTRACK
+-- https://github.com/postgrespro/ptrack
+
+
+-- store backup only 7 days and only 2 FULL backups
+-- pg_probackup-14 delete --instance 'main' --delete-expired --retention-window=7 --retention-redundancy=2
+
+
+-- backup script in cron
+-- https://habr.com/ru/company/barsgroup/blog/515592/
+
+--- delete backup instance from pg_probackup
+-- pg_probackup-14 del-instance --instance 'main'
+
+-- check data for corruprion
+-- https://postgrespro.ru/docs/postgresql/14/amcheck
+-- psql -d testb -c "CREATE EXTENSION amcheck"
+-- pg_probackup-14 checkdb -D /var/lib/postgresql/14/main
+
+
+-- PITR
+-- https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-PERFORMING-POINT-IN-TIME-PITR-RECOVERY
+
+psql testb -c "insert into test values (5);"
+
+
+
+pg_probackup-14 show -B /home/backups
+
+pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup -d testb -p 5432
+
+pg_ctlcluster 14 main2 stop
+rm -rf /var/lib/postgresql/14/main2
+
+pg_probackup-14 restore --instance 'main' -i 'R384XJ' -D /var/lib/postgresql/14/main2 -B /home/backups --recovery-target-time="2021-11-27 09:35:00+00"
+
+-- enable archive wal
+-- https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-SETTING-UP-CONTINUOUS-WAL-ARCHIVING
+-- https://habr.com/ru/company/barsgroup/blog/516088/
+psql -c 'alter system set archive_mode = on'
+psql 
+alter system set archive_command = 'pg_probackup-14 archive-push -B /home/backups/ --instance=main --wal-file-path=%p --wal-file-name=%f --compress';
+sudo pg_ctlcluster 14 main restart
+
+psql -c 'show archive_mode'
+psql -c 'show archive_command'
+
+psql testb -c "insert into test values (9);"
+pg_probackup-14 backup --instance 'main' -b FULL --stream --temp-slot -h localhost -U backup -d testb -p 5432
+
+pg_probackup-14 show
+
+pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup -d testb -p 5432
+
+-- -i 'R2TH83' - !!! not use this key
+pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 --recovery-target-time="2021-11-27 09:44:03+00"
+-- pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 --recovery-target-lsn="0/15000168"
+
+sudo pg_ctlcluster 14 main2 start
+
+cat /var/log/postgresql/postgresql-14-main2.log
+
+
+!!!! --restore-as-replica
+pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 -B /home/backups --recovery-target-time="2021-11-19 11:38:03+00" --restore-as-replica
+
+-- check restore
+psql testb -p 5433 -c 'select * from test;'
+
+gcloud compute instances delete probackup

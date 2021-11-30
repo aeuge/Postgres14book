@@ -2,24 +2,21 @@
 mv postgres_key.pem $HOME
 cd $HOME
 chmod 400 postgres_key.pem
-ssh -i postgres_key.pem azureuser@13.90.25.231
+ssh -i postgres_key.pem azureuser@20.115.2.248
 
-sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt-get -y install postgresql && sudo apt install unzip
+sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt -y install postgresql-14
+
 pg_lsclusters
 
-sudo -u postgres psql
-\password
--- test123
-exit
--- listener = '*'
-sudo nano /etc/postgresql/13/main/postgresql.conf
+sudo -u postgres psql -c "ALTER USER postgres WITH password 'test123';"
+echo "listen_addresses = '*'" | sudo tee -a /etc/postgresql/14/main/postgresql.conf
+echo "host all all 0.0.0.0/0 md5" | sudo tee -a /etc/postgresql/14/main/pg_hba.conf
 
--- host    all             all             0.0.0.0/0            md5
-sudo nano /etc/postgresql/13/main/pg_hba.conf
+sudo pg_ctlcluster 14 main restart
 
-sudo pg_ctlcluster 13 main restart
+sudo -u postgres psql -c "SHOW listen_addresses;"
 
-psql -h 13.90.25.231 -U postgres
+psql -h 20.115.2.248 -U postgres
 
 
 -- Azure SQL

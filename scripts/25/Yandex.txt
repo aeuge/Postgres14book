@@ -1,20 +1,17 @@
 -- compute cloud
-ssh aeugene@84.201.139.215
+ssh aeugene@130.211.238.16
 
-sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt-get -y install postgresql && sudo apt install unzip
+sudo apt update && sudo apt upgrade -y && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt -y install postgresql-14
+
 pg_lsclusters
 
-sudo -u postgres psql
-\password
--- test123
-exit
+sudo -u postgres psql -c "ALTER USER postgres WITH password 'test123';"
+echo "listen_addresses = '*'" | sudo tee -a /etc/postgresql/14/main/postgresql.conf
+echo "host all all 0.0.0.0/0 md5" | sudo tee -a /etc/postgresql/14/main/pg_hba.conf
 
-sudo pg_conftool 13 main set listen_addresses '*'
-echo "host    all             all             0.0.0.0/0            md5" | sudo tee --append /etc/postgresql/13/main/pg_hba.conf
+sudo pg_ctlcluster 14 main restart
 
-sudo pg_ctlcluster 13 main restart
-
-psql -h 84.201.139.215 -U postgres
+psql -h 130.211.238.16 -U postgres
 
 
 -- Yandex Managed Service for PostgreSQL
