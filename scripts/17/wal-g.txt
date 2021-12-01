@@ -1,4 +1,4 @@
--- postgres14
+-- wal-g & Postgres14
 gcloud beta compute --project=celtic-house-266612 instances create walg --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=ubuntu-2104-hirsute-v20211119 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
 gcloud compute ssh walg
 sudo apt update && sudo apt-mark hold linux-image-5.11.0-1023-gcp && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-14
@@ -10,12 +10,11 @@ sudo pg_lsclusters
 
 wget https://github.com/wal-g/wal-g/releases/download/v1.1.1-rc/wal-g-pg-ubuntu-20.04-amd64.tar.gz && tar -zxvf wal-g-pg-ubuntu-20.04-amd64.tar.gz && sudo mv wal-g-pg-ubuntu-20.04-amd64 /usr/local/bin/wal-g
 
-sudo ls -l /usr/local/bin/wal-g
+-- sudo ls -l /usr/local/bin/wal-g
 
-sudo rm -rf /home/backups && sudo mkdir /home/backups && sudo chmod 777 /home/backups
+sudo mkdir /home/backups && sudo chown postgres:postgres /home/backups
 
 -- create configuration file for wal-g
-
 sudo su postgres
 nano ~/.walg.json
 
@@ -57,9 +56,8 @@ psql testw -c "select * from test;"
 -- make backup
 wal-g backup-push /var/lib/postgresql/14/main
 
-cat /var/log/postgresql/postgresql-14-main.log
-
-wal-g backup-list
+-- cat /var/log/postgresql/postgresql-14-main.log
+-- cat /var/lib/postgresql/14/main/log/archive_command.log
 
 psql testw -c "UPDATE test SET i = 3 WHERE i = 30"
 
@@ -69,7 +67,6 @@ wal-g backup-push /var/lib/postgresql/14/main
 wal-g backup-list
 
 -- restore 
-
 pg_createcluster 14 main2
 rm -rf /var/lib/postgresql/14/main2
 
@@ -78,10 +75,9 @@ wal-g backup-fetch /var/lib/postgresql/14/main2 LATEST
 
 -- create signal file for recovery wal
 touch "/var/lib/postgresql/14/main2/recovery.signal"
-exit
-sudo pg_ctlcluster 14 main2 start
+pg_ctlcluster 14 main2 start
 
-sudo -u postgres psql -p 5433 testw -c "select * from test;"
+psql -p 5433 testw -c "select * from test;"
 
 
 -- GStore
@@ -95,11 +91,15 @@ nano ~/.walg.json
     "PGDATA": "/var/lib/postgresql/14/main",
     "PGHOST": "/var/run/postgresql/.s.PGSQL.5432"
 }
+exit
+
 gcloud compute instances list
 
-scp /mnt/c/download/celtic-house-266612-65d95e64c26a.json aeugene@34.135.20.21:/home/aeugene/
+scp /mnt/c/download/celtic-house-266612-65d95e64c26a.json aeugene@35.232.80.250:/home/aeugene/
+
 sudo cp /home/aeugene/celtic-house-266612-65d95e64c26a.json /var/lib/postgresql/celtic-house-266612-65d95e64c26a.json
 sudo chown postgres:postgres /var/lib/postgresql/celtic-house-266612-65d95e64c26a.json
+
 sudo su postgres
 
 wal-g backup-push /var/lib/postgresql/14/main
