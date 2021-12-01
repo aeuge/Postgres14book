@@ -155,50 +155,51 @@ psql testb -p 5433 -c 'select * from test;'
 -- PITR
 -- https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-PERFORMING-POINT-IN-TIME-PITR-RECOVERY
 
+-- enable archive wal
+-- https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-SETTING-UP-CONTINUOUS-WAL-ARCHIVING
+-- https://habr.com/ru/company/barsgroup/blog/516088/ 
+
+psql 
+alter system set archive_mode = on;
+alter system set archive_command = 'pg_probackup-14 archive-push -B /home/backups/ --instance=main --wal-file-path=%p --wal-file-name=%f --compress';
+exit
+
+pg_ctlcluster 14 main stop
+pg_ctlcluster 14 main start
+
+psql -c 'show archive_mode'
+psql -c 'show archive_command'
+
+psql testb -c 'select * from test;'
+
+pg_probackup-14 backup --instance 'main' -b FULL --stream --temp-slot -h localhost -U backup -d testb -p 5432
+
 psql testb -c "insert into test values (5);"
-
-
-
-pg_probackup-14 show -B /home/backups
 
 pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup -d testb -p 5432
 
 pg_ctlcluster 14 main2 stop
 rm -rf /var/lib/postgresql/14/main2
 
-pg_probackup-14 restore --instance 'main' -i 'R384XJ' -D /var/lib/postgresql/14/main2 -B /home/backups --recovery-target-time="2021-11-27 09:35:00+00"
-
--- enable archive wal
--- https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-SETTING-UP-CONTINUOUS-WAL-ARCHIVING
--- https://habr.com/ru/company/barsgroup/blog/516088/
-psql -c 'alter system set archive_mode = on'
-psql 
-alter system set archive_command = 'pg_probackup-14 archive-push -B /home/backups/ --instance=main --wal-file-path=%p --wal-file-name=%f --compress';
-sudo pg_ctlcluster 14 main restart
-
-psql -c 'show archive_mode'
-psql -c 'show archive_command'
-
-psql testb -c "insert into test values (9);"
-pg_probackup-14 backup --instance 'main' -b FULL --stream --temp-slot -h localhost -U backup -d testb -p 5432
-
 pg_probackup-14 show
-
-pg_probackup-14 backup --instance 'main' -b DELTA --stream --temp-slot -h localhost -U backup -d testb -p 5432
-
 -- -i 'R2TH83' - !!! not use this key
-pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 --recovery-target-time="2021-11-27 09:44:03+00"
+pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 --recovery-target-time="2021-12-01 09:08:10+00"
 -- pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 --recovery-target-lsn="0/15000168"
 
-sudo pg_ctlcluster 14 main2 start
+pg_ctlcluster 14 main2 start
 
-cat /var/log/postgresql/postgresql-14-main2.log
-
-
-!!!! --restore-as-replica
-pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 -B /home/backups --recovery-target-time="2021-11-19 11:38:03+00" --restore-as-replica
 
 -- check restore
 psql testb -p 5433 -c 'select * from test;'
+
+-- cat /var/log/postgresql/postgresql-14-main2.log
+
+!!!! --restore-as-replica
+pg_probackup-14 restore --instance 'main' -D /var/lib/postgresql/14/main2 --recovery-target-time="2021-11-19 11:38:03+00" --restore-as-replica
+
+
+-- how much to store wal in days
+-- pg_probackup set-config --instance db1 --wal-depth=3
+
 
 gcloud compute instances delete probackup

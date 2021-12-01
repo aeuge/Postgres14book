@@ -1,22 +1,20 @@
 -- postgres14
-gcloud beta compute --project=celtic-house-266612 instances create postgres --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=ubuntu-2104-hirsute-v20211022 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
-gcloud compute ssh postgres
-sudo apt update && sudo apt-mark hold linux-image-5.11.0-1022-gcp && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-14
+gcloud beta compute --project=celtic-house-266612 instances create walg --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=ubuntu-2104-hirsute-v20211119 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=postgres --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+gcloud compute ssh walg
+sudo apt update && sudo apt-mark hold linux-image-5.11.0-1023-gcp && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt -y install postgresql-14
 sudo pg_lsclusters
 
--- wal-g v1.1.1 
+-- wal-g v1.1.1-rc
 -- https://github.com/wal-g/wal-g
 -- install
 
--- !!! wget https://github.com/wal-g/wal-g/releases/download/v1.1.1/wal-g-fdb-ubuntu-20.04-amd64.tar.gz
--- sudo rm /usr/local/bin/wal-g
 wget https://github.com/wal-g/wal-g/releases/download/v1.1.1-rc/wal-g-pg-ubuntu-20.04-amd64.tar.gz && tar -zxvf wal-g-pg-ubuntu-20.04-amd64.tar.gz && sudo mv wal-g-pg-ubuntu-20.04-amd64 /usr/local/bin/wal-g
 
 sudo ls -l /usr/local/bin/wal-g
 
 sudo rm -rf /home/backups && sudo mkdir /home/backups && sudo chmod 777 /home/backups
 
--- Создаем файл конфигурации для wal-g
+-- create configuration file for wal-g
 
 sudo su postgres
 nano ~/.walg.json
@@ -43,30 +41,27 @@ echo "restore_command='wal-g wal-fetch \"%f\" \"%p\" >> /var/lib/postgresql/14/m
 
 cat ~/14/main/postgresql.auto.conf
 
--- Перезапускаем кластер PostgreSQL
-
+-- restart PostgreSQL
 pg_ctlcluster 14 main stop
 pg_ctlcluster 14 main start
 
--- Создадим новую базу данных
+-- create test db
+psql -c "CREATE DATABASE testw;"
 
-psql -c "CREATE DATABASE otus;"
-
--- Таблицу в этой базе данных и заполним ее тестовыми данными
-
-psql otus -c "create table test(i int);"
-psql otus -c "insert into test values (10), (20), (30);"
-psql otus -c "select * from test;"
+-- create test table
+psql testw -c "create table test(i int);"
+psql testw -c "insert into test values (10), (20), (30);"
+psql testw -c "select * from test;"
 
 
--- бэкап
+-- make backup
 wal-g backup-push /var/lib/postgresql/14/main
 
 cat /var/log/postgresql/postgresql-14-main.log
 
 wal-g backup-list
 
-psql otus -c "UPDATE test SET i = 3 WHERE i = 30"
+psql testw -c "UPDATE test SET i = 3 WHERE i = 30"
 
 -- make delta
 wal-g backup-push /var/lib/postgresql/14/main
@@ -81,15 +76,15 @@ rm -rf /var/lib/postgresql/14/main2
 wal-g backup-fetch /var/lib/postgresql/14/main2 LATEST
 
 
--- сделаем файл для восстановления из архивов wal
+-- create signal file for recovery wal
 touch "/var/lib/postgresql/14/main2/recovery.signal"
 exit
 sudo pg_ctlcluster 14 main2 start
 
-sudo -u postgres psql -p 5433 otus -c "select * from test;"
+sudo -u postgres psql -p 5433 testw -c "select * from test;"
 
 
--- Настроим на Gstore
+-- GStore
 rm $HOME/.walg.json
 nano ~/.walg.json
 {
@@ -110,3 +105,5 @@ sudo su postgres
 wal-g backup-push /var/lib/postgresql/14/main
 
 wal-g backup-list
+
+gcloud compute instances delete walg
