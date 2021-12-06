@@ -102,4 +102,11 @@ psql
 CREATE EXTENSION pgstattuple;
 \d+ pgbench_accounts
 SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
-
+update pgbench_accounts set bid = bid + 1000000;
+SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
+update pgbench_accounts set aid = aid + 1000000;
+SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
+VACUUM pgbench_accounts;
+SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx
+REINDEX INDEX CONCURRENTLY pgbench_accounts_pkey;
+SELECT * FROM pgstatindex('pgbench_accounts_pkey') \gx

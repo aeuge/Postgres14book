@@ -25,8 +25,29 @@ SELECT context, count(*) FROM pg_settings GROUP BY context ORDER BY 2 desc;
 SELECT category, count(*) FROM pg_settings GROUP BY category ORDER BY 2 desc;
 SELECT source, count(*) FROM pg_settings GROUP BY source ORDER BY 2 desc;
 
+--SELECT pg_reload_conf(); 
+--sudo pg_ctlcluster 14 main reload
+--sudo pg_ctlcluster 14 main restart
+--ALTER SYSTEM reset <name>
+--ALTER SYSTEM reset all
+-- SET <parameter> to '<value>'; 
+-- SELECT set_conﬁg('<name>', '<value>', false);
+
+
 -- get current value 
 SELECT setting||' x '||coalesce(unit,'units') FROM pg_settings WHERE name='shared_buffers';
+
+sudo nano /etc/postgresql/14/main/postgresql.conf
+sudo -u postgres psql
+SELECT pg_reload_conf();
+SHOW work_mem;
+exit
+sudo nano /etc/postgresql/14/main/postgresql.conf
+sudo -u postgres psql
+SELECT pg_reload_conf();
+SELECT * FROM pg_settings WHERE name = 'work_mem' \gx
+
+
 SELECT setting||' x '||coalesce(unit,'units') FROM pg_settings WHERE name='max_connections';
 SHOW max_connections;
 SELECT current_setting('max_connections');
@@ -34,7 +55,7 @@ SELECT current_setting('max_connections');
 -- pg_file_settings
 SELECT count(*) from pg_file_settings;
 SELECT sourcefile, count(*) FROM pg_file_settings GROUP BY sourcefile;
-SELECT * FROM pg_file_settings WHERE sourcefile='/var/lib/postgresql/14/maintest/postgresql.auto.conf';
+SELECT * FROM pg_file_settings WHERE sourcefile='/var/lib/postgresql/14/main/postgresql.auto.conf';
 
 
 -- tuning

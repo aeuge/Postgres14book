@@ -18,6 +18,19 @@
 17. https://github.com/wal-g/wal-g
 18. https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/
 19. https://www.postgresql.org/docs/14/app-pgverifybackup.html
+20. https://habr.com/ru/company/barsgroup/blog/515592/ 
+21. https://github.com/postgrespro/ptrack 
+22. https://postgrespro.ru/docs/postgresql/14/amcheck 
+23. https://habr.com/ru/company/barsgroup/blog/515592/ 
+24. https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-PERFORMING-POINT-IN-TIME-PITR-RECOVERY 
+25. https://postgrespro.ru/docs/postgrespro/13/app-pgprobackup#PBK-SETTING-UP-CONTINUOUS-WAL-ARCHIVING 
+26. https://habr.com/ru/company/barsgroup/blog/516088/
+27. https://github.com/wal-g/wal-g/blob/master/docs/STORAGES.md 
+28. https://github.com/wal-g/wal-g/blob/master/docs/PostgreSQL.md 
+
+
+bonus:
+https://habr.com/ru/post/486188/ 
 
 
 

@@ -161,19 +161,20 @@ psql
 \dt+ bookings.*
 
 -- build a list of flights
+\timing
 SELECT  flight_no
 FROM bookings.flights 
 limit 10;
 
 -- add the flight date without time
 SELECT  flight_no
-		, scheduled_departure::date as vilet
+		, scheduled_departure::date as depart_date
 FROM bookings.flights 
 limit 10;
 
 -- add the departure airport
 SELECT  f.flight_no
-		, f.scheduled_departure::date as vilet
+		, f.scheduled_departure::date as depart_date
 		, a1.airport_name as FROM
 FROM bookings.flights f
 JOIN bookings.airports as a1 
@@ -181,8 +182,8 @@ JOIN bookings.airports as a1
 limit 10;
 
 -- add the arrival airport and sort by departure date
-SELECT  f.flight_no
-		, f.scheduled_departure::date as vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date as depart_date
 		, a1.airport_name as from_air
 		, a2.airport_name as to_air
 FROM bookings.flights f
@@ -190,14 +191,14 @@ JOIN bookings.airports as a1
 	on a1.airport_code = f.departure_airport
 JOIN bookings.airports as a2 
 	on a2.airport_code = f.arrival_airport
-order by vilet
+order by depart_date, no
 limit 10;
 
 -- count the number of tickets sold
 -- SELECT * FROM bookings.ticket_flights tf WHERE tf.flight_id = 61;
 
-SELECT  f.flight_no
-		, f.scheduled_departure::date as vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date as depart_date
 		, a1.airport_name as from_air
 		, a2.airport_name as to_air
 		, count(tf.ticket_no)
@@ -208,14 +209,14 @@ JOIN bookings.airports as a2
 	ON a2.airport_code = f.arrival_airport
 LEFT JOIN bookings.ticket_flights tf 
 	ON tf.flight_id = f.flight_id
-GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air
-ORDER BY vilet
+GROUP BY f.flight_id, f.flight_no, depart_date, from_air, to_air
+ORDER BY depart_date, no
 LIMIT 10;
 
 -- calculate the capacity
 EXPLAIN ANALYZE
-SELECT  f.flight_no
-		, f.scheduled_departure::date as vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date as depart_date
 		, a1.airport_name as from_air
 		, a2.airport_name as to_air
 		, count(s.seat_no)
@@ -229,21 +230,22 @@ JOIN bookings.seats as s
 	ON s.aircraft_code = f.aircraft_code
 LEFT JOIN bookings.ticket_flights tf 
 	ON tf.flight_id = f.flight_id
-GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air
-ORDER BY vilet
+GROUP BY f.flight_id, f.flight_no, depart_date, from_air, to_air
+ORDER BY depart_date, no
 LIMIT 10;
 
 --- very bad query. Why?
 
+
 -- let`s optimize
 -- 1 option
-EXPLAIN ANALYZE WITH vsego AS (
+WITH vsego AS (
 	SELECT count(s.seat_no) as c, s.aircraft_code
 	FROM bookings.seats s
 	GROUP BY aircraft_code
 )
-SELECT  f.flight_no
-		, f.scheduled_departure::date as vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date as depart_date
 		, a1.airport_name as from_air
 		, a2.airport_name as to_air
 		, v.c as vsego_mest
@@ -257,13 +259,13 @@ JOIN vsego as v
   ON v.aircraft_code = f.aircraft_code
 LEFT JOIN bookings.ticket_flights tf 
 	ON tf.flight_id = f.flight_id
-GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air, v.c
-ORDER BY vilet
+GROUP BY f.flight_id, f.flight_no, depart_date, from_air, to_air, v.c
+ORDER BY depart_date, no
 LIMIT 10;
 
 -- 2 option
-SELECT  f.flight_no
-		, f.scheduled_departure::date AS vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date AS depart_date
 		, a1.airport_name AS from_air
 		, a2.airport_name AS to_air
 		, (SELECT count(*) FROM bookings.seats AS s WHERE s.aircraft_code = f.aircraft_code) AS vsego_mest
@@ -275,13 +277,13 @@ JOIN bookings.airports AS a2
 	ON a2.airport_code = f.arrival_airport
 LEFT JOIN bookings.ticket_flights tf 
 	ON tf.flight_id = f.flight_id
-GROUP BY f.flight_id, f.flight_no, vilet, from_air, to_air
-ORDER BY vilet
+GROUP BY f.flight_id, f.flight_no, depart_date, from_air, to_air
+ORDER BY depart_date, no
 LIMIT 10;
 
 -- at the end
-SELECT  f.flight_no
-		, f.scheduled_departure::date AS vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date AS depart_date
 		, a1.airport_name AS from_air
 		, a2.airport_name AS to_air
 		, (SELECT count(*) FROM bookings.seats AS s WHERE s.aircraft_code = f.aircraft_code) AS vsego_mest
@@ -291,7 +293,7 @@ JOIN bookings.airports AS a1
 	ON a1.airport_code = f.departure_airport
 JOIN bookings.airports AS a2 
 	ON a2.airport_code = f.arrival_airport
-ORDER BY vilet
+ORDER BY depart_date, no
 LIMIT 10;
 
 -- the fastest option. any ideas?
@@ -305,8 +307,8 @@ zanyato AS (
 	FROM bookings.ticket_flights tf
 	group by flight_id
 )
-SELECT  f.flight_no
-		, f.scheduled_departure::date as vilet
+SELECT  f.flight_no as no
+		, f.scheduled_departure::date as depart_date
 		, a1.airport_name as from_air
 		, a2.airport_name as to_air
 		, v.c as vsego_mest
@@ -320,5 +322,5 @@ JOIN vsego as v
 	ON v.aircraft_code = f.aircraft_code
 LEFT JOIN zanyato z
 	ON z.flight_id = f.flight_id
-ORDER BY vilet
+ORDER BY depart_date, no
 LIMIT 10;
