@@ -25,3 +25,5 @@
 24. https://github.com/citusdata/cstore_fdw 
 25. https://github.com/timescale/timescaledb
 
+bonus:
+https://habr.com/ru/company/oleg-bunin/blog/597187/
