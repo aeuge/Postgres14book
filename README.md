@@ -1,8 +1,8 @@
 ## Книга: PostgreSQL 14. Оптимизация, Kubernetes, кластера, облака.
 #### Author https://aristov.tech
 #### В новой версии актуализированы материалы, уменьшено количество теоретических материалов, добавлено много новой практики, обновление кластера с 13 на 14 версию с особенностями нового шифрования паролей, современные бэкапы pgBackRest, pg_probackup, Wal-G, утилита pg_rewind для восстановления кластера после сбоя.
-#### Отрывок книги PostgreSQL 14. Оптимизация, Kubernetes, кластера, облака. https://aristov.tech/PostgreSQL14preview.pdf
-#### заказ https://aristov.tech/#orderbook
+#### Книга доступна бесплатно на сайте автора [https://aristov.tech/Postgres14book.pdf](https://aristov.tech/Postgres14book.pdf)
+#### Новые книги по 16/18 Постгресу можно заказать https://aristov.tech/#orderbook
 ## Оглавление
 1. [PostgreSQL 14. Установка, новые возможности](https://github.com/aeuge/Postgres14book/blob/main/chapters/CHAPTER01.md)
 2. [Физический уровень](https://github.com/aeuge/Postgres14book/blob/main/chapters/CHAPTER02.md)
